@@ -45,7 +45,7 @@ export class AdvancedArray extends Array {
         //     }
         //     return result;
         // }, []);
-        
+
         const clean = this
             .filter(e => e !== undefined)
             .flatMap((item, i, arr) => {
@@ -61,24 +61,24 @@ export class AdvancedArray extends Array {
 }
 
 export class LevelState {
-  constructor() {
-    this.levels = new Map();
-  }
-
-  setLevel(level, data) {
-    // Remove deeper levels.
-    for (const l of [...this.levels.keys()]) {
-      if (l > level) {
-        this.levels.delete(l);
-      }
+    constructor() {
+        this.levels = new Map();
     }
-    this.levels.set(level, data);
-  }
 
-  isDifferentFromParent(level, data) {
-    this.setLevel(level, data);
-    const prev = this.levels.get(level - 1);
-    const curr = this.levels.get(level);
-    return prev !== curr;
-  }
+    setLevel(level, data) {
+        // Remove deeper levels.
+        for (const l of [...this.levels.keys()]) {
+            if (l > level) {
+                this.levels.delete(l);
+            }
+        }
+        this.levels.set(level, data);
+    }
+
+    isDifferentFromParent(level, data) {
+        this.setLevel(level, data);
+        const prev = this.levels.get(level - 1);
+        const curr = this.levels.get(level);
+        return prev !== curr;
+    }
 }

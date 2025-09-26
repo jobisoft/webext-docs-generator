@@ -55,32 +55,32 @@ export async function getSchemaFiles(folderPath) {
 }
 
 async function clearFolder(folderPath) {
-    try {
-        const stats = await fs.stat(folderPath);
-        if (!stats.isDirectory()) {
-            throw new Error(`${folderPath} exists but is not a directory`);
-        }
-        // Folder exists — clear its contents
-        const entries = await fs.readdir(folderPath, { withFileTypes: true });
-        for (const entry of entries) {
-            // Skip hidden files/folders
-            if (entry.name.startsWith('.')) continue;
-
-            const fullPath = path.join(folderPath, entry.name);
-            if (entry.isDirectory()) {
-                await fs.rm(fullPath, { recursive: true, force: true });
-            } else {
-                await fs.unlink(fullPath);
-            }
-        }
-    } catch (err) {
-        if (err.code === 'ENOENT') {
-            // Folder does not exist — create it
-            await fs.mkdir(folderPath, { recursive: true });
-        } else {
-            throw err; // propagate other errors
-        }
+  try {
+    const stats = await fs.stat(folderPath);
+    if (!stats.isDirectory()) {
+      throw new Error(`${folderPath} exists but is not a directory`);
     }
+    // Folder exists — clear its contents
+    const entries = await fs.readdir(folderPath, { withFileTypes: true });
+    for (const entry of entries) {
+      // Skip hidden files/folders
+      if (entry.name.startsWith('.')) continue;
+
+      const fullPath = path.join(folderPath, entry.name);
+      if (entry.isDirectory()) {
+        await fs.rm(fullPath, { recursive: true, force: true });
+      } else {
+        await fs.unlink(fullPath);
+      }
+    }
+  } catch (err) {
+    if (err.code === 'ENOENT') {
+      // Folder does not exist — create it
+      await fs.mkdir(folderPath, { recursive: true });
+    } else {
+      throw err; // propagate other errors
+    }
+  }
 }
 
 /**
@@ -113,6 +113,45 @@ export async function copyFolder(source, destination) {
       }
     })
   );
+}
+
+/**
+ * Fix malformed <val> or <var> tags written as double opening tags:
+ * e.g., <val>something<val>  -> <val>something</val>
+ *
+ * @param {string} str
+ * @param {string[]} tags  list of tag names to repair
+ * @returns {string}
+ */
+export function fixMalformedClosingTags(str, tags = []) {
+  for (const tag of tags) {
+    const openTag = `<${tag}>`;
+    let start = 0;
+
+    while (true) {
+      // find the first opening tag
+      const first = str.indexOf(openTag, start);
+      if (first === -1) break;
+
+      // find the next opening tag after the first
+      const second = str.indexOf(openTag, first + openTag.length);
+      if (second === -1) break;
+
+      // check if there is a proper closing tag in between
+      const content = str.slice(first + openTag.length, second);
+      if (!content.includes(`</${tag}>`)) {
+        // fix: replace the second opening with a closing tag
+        str =
+          str.slice(0, second) +
+          `</${tag}>` +
+          str.slice(second + openTag.length);
+      }
+
+      // continue search after the first tag (or second if fixed)
+      start = second + 1;
+    }
+  }
+  return str;
 }
 
 /**

@@ -1,4 +1,5 @@
 import { AdvancedArray, LevelState } from "./classes.mjs";
+import { fixMalformedClosingTags } from "./tools.mjs"
 
 const DBT = "``";
 const SBT = "`";
@@ -442,6 +443,9 @@ export class Writer {
     }
 
     replace_code(str) {
+        // Fix malformed <val> and <var> tags where closing tag is missing
+        str = fixMalformedClosingTags(str, ["val", "var", "code", "permission"]);
+
         const replacements = {
             "<em>": "*",
             "</em>": "*",
@@ -449,12 +453,16 @@ export class Writer {
             "</b>": "**",
             "<code>": ":code:`",
             "</code>": "`",
+            // Work around sphinx bug ignoring roles if they start with spaces,
+            // by prefixing a zero-width space.
+            "<var> ": ":value:`\u200B ",
+            "<val> ": ":value:`\u200B ",
             "<var>": ":value:`",
+            "<val>": ":value:`",
             "</var>": "`",
+            "</val>": "`",
             "<permission>": ":permission:`",
             "</permission>": "`",
-            "<val>": ":value:`",
-            "</val>": "`",
             "&mdash;": "—",
             // Some tags just have to go.
             "<p>": "",
@@ -485,6 +493,9 @@ export class Writer {
         // Regex replacements
         str = str.replace(/\$\((ref:(.*?))\)/g, ":ref:`$2`");
         str = str.replace(/\$\((doc:(.*?))\)/g, ":doc:`$2`");
+        // Replace deprecated $(topic:...) references with their plain link text.
+        str = str.replace(/\$\((topic:[^\)]+)\)\[(.*?)\]/g, "$2");
+        // Replace URLs.
         str = str.replace(/<a href="(.*?)">(.*?)<\/a>/g, "`$2 <$1>`__");
         str = str.replace(/<a href='(.*?)'>(.*?)<\/a>/g, "`$2 <$1>`__");
 
@@ -611,7 +622,7 @@ export class Writer {
             }
         }*/
 
-        return `:ref:\`${ref}\``;
+        return `:ref:${SBT}${ref}${SBT}`;
     }
 
     async generateManifestSection() {
@@ -651,7 +662,7 @@ export class Writer {
         let permissionLines = new AdvancedArray();
         for (let value of this.foundPermissions) {
             permissionLines.append(this.api_member({
-                name: `:permission:\`${value}\``,
+                name: `:permission:${SBT}${value}${SBT}`,
                 description: permissionStrings[value]
                     ? [permissionStrings[value]]
                     : []
