@@ -234,6 +234,7 @@ export class Writer {
             const permissions = Array.from(new Set(this.apiSchema.permissions)).sort();
             for (const permission of permissions) {
                 if (!permission.startsWith("manifest:")) {
+                    this.foundPermissions.add(permission);
                     entries.permissions.entries.push(`:permission:${SBT}${permission}${SBT}`);
                 } else {
                     entries.manifest.entries.push(`:value:${SBT}${permission.slice(9)}${SBT}`);
@@ -283,6 +284,7 @@ export class Writer {
         const entries = [];
         for (const permission of Array.from(new Set(allPermissions)).sort()) {
             if (!permission.startsWith("manifest:")) {
+                this.foundPermissions.add(permission);
                 entries.push(`- :permission:${SBT}${permission}${SBT}`);
             }
         }
@@ -461,8 +463,6 @@ export class Writer {
             "<val>": ":value:`",
             "</var>": "`",
             "</val>": "`",
-            "<permission>": ":permission:`",
-            "</permission>": "`",
             "&mdash;": "—",
             // Some tags just have to go.
             "<p>": "",
@@ -498,6 +498,11 @@ export class Writer {
         // Replace URLs.
         str = str.replace(/<a href="(.*?)">(.*?)<\/a>/g, "`$2 <$1>`__");
         str = str.replace(/<a href='(.*?)'>(.*?)<\/a>/g, "`$2 <$1>`__");
+        // Replace and track permissions.
+        str = str.replace(/<permission>(.*?)<\/permission>/g, (match, permission) => {
+            this.foundPermissions.add(permission);
+            return `:permission:${SBT}${permission}${SBT}`;
+        });
 
         return str;
     }
@@ -657,18 +662,20 @@ export class Writer {
             }
         }
 
+        let manifestPermissions = new AdvancedArray();
+        manifestPermissions.append(await this.format_manifest_permissions());
+
         // Include all permissions used somewhere in this API.
         // TODO: SensitiveDataUpload
-        let permissionLines = new AdvancedArray();
-        for (let value of this.foundPermissions) {
-            permissionLines.append(this.api_member({
+        let usedPermissions = new AdvancedArray();
+        for (const value of Array.from(this.foundPermissions).sort()) {
+            usedPermissions.append(this.api_member({
                 name: `:permission:${SBT}${value}${SBT}`,
                 description: permissionStrings[value]
                     ? [permissionStrings[value]]
                     : []
             }));
         }
-        permissionLines.append(await this.format_manifest_permissions());
 
         let section = new AdvancedArray();
         if (propertyLines.length > 0) {
@@ -677,9 +684,13 @@ export class Writer {
             this.sidebar.set("manifest", "  * `Manifest file properties`_");
         }
 
-        if (permissionLines.length > 0) {
+        if (manifestPermissions.length > 0 || usedPermissions.length > 0) {
             section.append(this.header_2("Permissions"));
-            section.append(permissionLines);
+            if (usedPermissions.length > 0) {
+                section.addParagraph("The following permissions influence the behavior of the API: depending on which permissions are requested, certain functions may be unavailable or some data may be omitted from responses.")
+            }
+            section.append(usedPermissions);
+            section.append(manifestPermissions);
             this.sidebar.set("permissions", "  * `Permissions`_");
         }
 
