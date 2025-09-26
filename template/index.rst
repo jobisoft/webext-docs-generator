@@ -1,19 +1,15 @@
 .. container:: sticky-sidebar
-
+  
   ≡ On this page
   
   * `Getting started`_
-  * :ref:`Examples`
-  * :ref:`Experiments`
-  * :ref:`ChangeLog`
   * `Where to get help and more information`_
 
-  .. include:: /overlay/developer-resources.rst 
+  .. include:: developer-resources.rst
 
+{{TITLE}}
 
-===============================================
-WebExtension Documentation for Thunderbird Beta
-===============================================
+{{VERSION_NOTE}}
 
 Getting started
 ===============
@@ -52,94 +48,7 @@ repository can be used to obtain a copy of the relevant files.
   :hidden:
   :caption: API reference
   
-  accounts
-  addressBooks
-  addressBooks.provider
-  addressBooks.contacts
-  addressBooks.mailingLists
-  alarms
-  action
-  browserSettings
-  browserSettings.colorManagement
-  browsingData
-  clipboard
-  cloudFile
-  commands
-  compose
-  composeAction
-  contentScripts
-  contextualIdentities
-  cookies
-  declarativeNetRequest
-  dns
-  downloads
-  extension
-  composeScripts
-  messageDisplayScripts
-  folders
-  i18n
-  identities
-  identity
-  idle
-  mailTabs
-  management
-  menus
-  messageDisplay
-  messageDisplayAction
-  messages
-  messages.tags
-  notifications
-  permissions
-  pkcs11
-  privacy
-  privacy.network
-  privacy.services
-  privacy.websites
-  runtime
-  scripting
-  scripting.compose
-  scripting.messageDisplay
-  sessions
-  spaces
-  storage
-  tabs
-  theme
-  userScripts
-  messengerUtilities
-  webNavigation
-  webRequest
-  windows
-
-.. _Examples:
-
-.. toctree::
-  :glob:
-  :maxdepth: 1
-  :caption: Examples
-
-  examples/*
-
-.. _Experiments:
-
-.. toctree::
-  :maxdepth: 1
-  :caption: Experiment APIs
-
-  experiments/introduction
-  experiments/generator
-  experiments/folders_and_messages
-  experiments/tabs_and_windows
-  experiments/contribute
-
-.. _ChangeLog:
-
-.. toctree::
-  :maxdepth: 1
-  :caption: Changelog
-
-  changes/140
-  changes/128
-
+  {{API_LIST}}
 
 Where to get help and more information
 ======================================

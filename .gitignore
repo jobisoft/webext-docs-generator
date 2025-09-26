@@ -1,1 +1,3 @@
-_out
+old
+node_modules
+_all.json

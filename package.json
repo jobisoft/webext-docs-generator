@@ -1,0 +1,6 @@
+{
+  "dependencies": {
+    "htmlparser2": "^10.0.0",
+    "striptags": "^3.2.0"
+  }
+}
