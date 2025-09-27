@@ -520,6 +520,39 @@ export class Writer {
         ];
     }
 
+    format_link(ref) {
+        if (ref === "extensionTypes.File") {
+            return "`File <https://developer.mozilla.org/en-US/docs/Web/API/File>`__";
+        }
+        if (ref === "extensionTypes.Date") {
+            return "`Date <https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Date>`__";
+        }
+        if (ref === "runtime.Port") {
+            return "`Port <https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/API/runtime/Port>`__";
+        }
+
+        // Links to the same page do not need to provide a namespace.
+        if (ref.startsWith(`${this.namespace}.`)) {
+            ref = ref.slice(this.namespace.length + 1)
+        }
+        this.foundTypes.add(ref);
+
+        // Global types will be handled per API, locally.
+        for (let prefix of ["manifest.", "extensionTypes."]) {
+            if (ref.startsWith(prefix)) {
+                ref = ref.slice(prefix.length);
+                break;
+            }
+        }
+        // Make sure the namespace is prefixed for local links.
+        if (!ref.includes(".")) {
+            ref = `${this.namespace}.${ref}`;
+        }
+
+
+        return `:ref:${SBT}${ref}${SBT}`;
+    }
+
     get_api_member_parts(name, value) {
         const parts = {
             name: "",
@@ -587,53 +620,12 @@ export class Writer {
                 return obj.type;
             }
         } else if ("$ref" in obj) {
-            return this.link_ref(obj["$ref"]);
+            return this.format_link(obj["$ref"]);
         }
-    }
-
-    link_ref(ref) {
-        // TODO: Assume additional_type_defs, additional_type_used, current_namespace are in scope
-        if (ref === "extensionTypes.File") {
-            return "`File <https://developer.mozilla.org/en-US/docs/Web/API/File>`__";
-        }
-        if (ref === "extensionTypes.Date") {
-            return "`Date <https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Date>`__";
-        }
-        if (ref === "runtime.Port") {
-            return "`Port <https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/API/runtime/Port>`__";
-        }
-
-        // Make sure the namespace is prefixed.
-        if (!ref.includes(".")) {
-            ref = `${this.namespace}.${ref}`;
-        }
-        this.foundTypes.add(ref);
-
-        // Global types will be handled per API, locally.
-        for (let prefix of ["manifest.", "extensionTypes."]) {
-            if (ref.startsWith(prefix)) {
-                ref = `${this.namespace}.${ref.slice(prefix.length)}`;
-                break;
-            }
-        }
-
-        //if (ref === "IconPath" || ref.endsWith(".IconPath")) {
-        //    ref = "IconPath";
-        //}
-
-        /*for (const moz_namespace of ["extension.", "extensionTypes."]) {
-            if (ref.startsWith(moz_namespace)) {
-                const name = ref.slice(moz_namespace.length);
-                let url = `https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/API/${moz_namespace.slice(0, -1)}/${name}`;
-                return `\`${name} <${url}>\`__`;
-            }
-        }*/
-
-        return `:ref:${SBT}${ref}${SBT}`;
     }
 
     async generateManifestSection() {
-        let propertyLines = new AdvancedArray();
+        let section = new AdvancedArray();
         if (this.manifestSchema.types) {
             for (let type of this.manifestSchema.types) {
                 if (type.$extend === "WebExtensionManifest") {
@@ -644,12 +636,21 @@ export class Writer {
                         return aSort < bSort ? -1 : aSort > bSort ? 1 : 0;
                     });
                     for (let [name, value] of items) {
-                        propertyLines.append(this.format_object(name, value));
+                        section.append(this.format_object(name, value));
                     }
                 }
             }
         }
 
+        if (section.length > 0) {
+            section.prepend(this.header_2("Manifest file properties"));
+            this.sidebar.set("manifest", "  * `Manifest file properties`_");
+        }
+
+        return section;
+    }
+
+    async generatePermissionsSection() {
         let permissionStrings = {};
         for (let line of this.permissionLocales.split("\n")) {
             if (line.startsWith("webext-perms-description")) {
@@ -680,12 +681,6 @@ export class Writer {
         }
 
         let section = new AdvancedArray();
-        if (propertyLines.length > 0) {
-            section.append(this.header_2("Manifest file properties"));
-            section.append(propertyLines);
-            this.sidebar.set("manifest", "  * `Manifest file properties`_");
-        }
-
         if (manifestPermissions.length > 0 || usedPermissions.length > 0) {
             section.append(this.header_2("Permissions"));
             if (usedPermissions.length > 0) {
@@ -841,41 +836,52 @@ export class Writer {
             return null;
         }
 
-        const fix_id = (id) => {
-            if (id.includes(".")) {
+        const prefix_namespace = (id) => {
+            if (id.startsWith(`${this.namespace}.`)) {
                 return id;
             }
             return `${this.namespace}.${id}`
         }
-
+        const prefix_manifest = (id) => {
+            if (id.startsWith("`manifest.")) {
+                return id;
+            }
+            return `manifest.${id}`
+        }
         // We use a writer for each type definition, so we can add types as we go
         // and sort them at the end. We loop over foundTypes until it does not change
         // anymore (to find nested types).
+
+        // The collected types could be without namespace, which could either be
+        // manifest.* or namespace.*
         const definitions = new Map();
-        const missing = new Set();
+        let done = false;
+
         do {
             let prevFoundSize = this.foundTypes.size;
             for (const id of [...this.foundTypes].filter(id => !definitions.has(id))) {
+
                 const typeDef =
                     this.globalTypes.get(id) ||
-                    (this.apiSchema.types && this.apiSchema.types.find(e => e.id && fix_id(e.id) == id)) ||
-                    (this.manifestSchema.types && this.manifestSchema.types.find(e => e.id && fix_id(e.id) == id));
+                    this.globalTypes.get(`manifest.${id}`) ||
+                    (this.apiSchema.types && this.apiSchema.types.find(e => e.id && prefix_namespace(e.id) == prefix_namespace(id))) ||
+                    (this.manifestSchema.types && this.manifestSchema.types.find(e => e.id && prefix_manifest(e.id) == prefix_manifest(id)));
 
                 if (typeDef) {
                     definitions.set(id, this.format_type(typeDef));
-                } else if (!(
-                    id.includes(".") &&
-                    this.allNamespaces.includes(id.split(".").slice(0, -1).join("."))
-                )) {
-                    // All other are either types of other APIs, or missing.
-                    missing.add(id);
+                } else if (done && !id.includes(".")) {
+                    // We are done, but this is missing, log it.
+                    console.log("Missing Type", this.namespace, id)
                 };
             }
-            if (prevFoundSize == this.foundTypes.size) {
+
+            if (done) {
                 break;
             }
+            if (prevFoundSize == this.foundTypes.size) {
+                done = true;
+            }
         } while (true)
-        missing.forEach(id => console.log("TODO", this.namespace, id, "missing"));
 
         const section = new AdvancedArray();
         [...definitions.entries()]
@@ -932,13 +938,14 @@ export class Writer {
     async generateApiDoc() {
         const title = `${this.namespace} API`;
         const doc = new AdvancedArray();
+        const manifest = await this.generateManifestSection();
         const functions = await this.generateFunctionsSection();
         const events = await this.generateEventsSection()
-        const types = await this.generateTypesSection()
         const properties = await this.generatePropertiesSection()
+        const types = await this.generateTypesSection()
 
         // Last, because it needs api.foundPermissions to be populated.
-        const manifest = await this.generateManifestSection();
+        const permissions = await this.generatePermissionsSection();
 
         doc.append([
             ".. container:: sticky-sidebar",
@@ -973,6 +980,7 @@ export class Writer {
         doc.append(this.format_description(this.apiSchema));
 
         doc.addSection(manifest);
+        doc.addSection(permissions);
         doc.addSection(functions);
         doc.addSection(events);
         doc.addSection(types);
