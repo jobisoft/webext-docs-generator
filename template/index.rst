@@ -5,7 +5,7 @@
   * `Getting started`_
   * `Where to get help and more information`_
 
-  .. include:: developer-resources.rst
+  .. include:: _includes/developer-resources.rst
 
 {{TITLE}}
 
@@ -41,7 +41,7 @@ __ https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Obje
 __ https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Using_promises
 
 The documentation for the APIs listed in the left side panel is generated automatically from
-Thunderbird's schema files. The `webext-schemas <https://github.com/thunderbird/webext-schemas>`__
+Thunderbird's schema files. The `webext-schemas <https://github.com/thunderbird/webext-annotated-schemas>`__
 repository can be used to obtain a copy of the relevant files.
 
 .. toctree::
