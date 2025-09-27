@@ -959,7 +959,7 @@ export class Writer {
             this.sidebar.get("types"),
             this.sidebar.get("properties"),
             "",
-            "  .. include:: /includes/developer-resources.rst",
+            "  .. include:: /_includes/developer-resources.rst",
             "",
             //        "  ≡ Related information",
             //        "",
