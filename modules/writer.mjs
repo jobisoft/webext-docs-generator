@@ -355,12 +355,14 @@ export class Writer {
 
                     for (const [key, value] of items) {
                         if (!value.optional) {
+                            content.append(this.reference(`${this.namespace}.${typeDef.id}.${key}`));
                             content.append(this.format_object(key, value));
                         }
                     }
 
                     for (const [key, value] of items) {
                         if (value.optional) {
+                            content.append(this.reference(`${this.namespace}.${typeDef.id}.${key}`));
                             content.append(this.format_object(key, value));
                         }
                     }
