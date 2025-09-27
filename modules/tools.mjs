@@ -217,6 +217,26 @@ export async function replacePlaceholdersInFile(filename, replacements) {
  * @returns {Array<object>} Updated entries array
  */
 export function mergeSchema(entries, entry, manifest) {
+  const stableStringify = (obj) => {
+    if (obj === null || typeof obj !== "object") {
+      return String(obj); // primitives
+    }
+
+    if (Array.isArray(obj)) {
+      return "[" + obj.map(stableStringify).join(",") + "]";
+    }
+
+    // object: sort keys
+    return "{" + Object.keys(obj).sort()
+      .map(k => JSON.stringify(k) + ":" + stableStringify(obj[k]))
+      .join(",") + "}";
+  }
+
+  const isEqual = (a, b) => {
+    if (a === b) return true;
+    return stableStringify(a) === stableStringify(b);
+  }
+
   const subMerge = (a, b) => { // b into a
     for (let entry of Object.keys(b)) {
       if (typeof b[entry] === "string") {
@@ -239,8 +259,12 @@ export function mergeSchema(entries, entry, manifest) {
           continue;
         }
         if (isPlainObject(b[entry][0]) && Array.isArray(a[entry])) {
-          // Just add new entries.
-          a[entry].push(...b[entry]);
+          // Merge, but skip existing entries.
+          a[entry].push(
+            ...b[entry].filter(bItem =>
+              !a[entry].some(aItem => isEqual(aItem, bItem))
+            )
+          );
           continue;
         }
       }
