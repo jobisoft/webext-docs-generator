@@ -685,7 +685,7 @@ export class Writer {
         if (manifestPermissions.length > 0 || usedPermissions.length > 0) {
             section.append(this.header_2("Permissions"));
             if (usedPermissions.length > 0) {
-                section.addParagraph("The following permissions influence the behavior of the API: depending on which permissions are requested, certain functions may be unavailable or some data may be omitted from responses.")
+                section.addParagraph(strings.permission_header)
             }
             section.append(usedPermissions);
             section.append(manifestPermissions);
@@ -983,7 +983,9 @@ export class Writer {
             doc.append([
                 ".. hint::",
                 "",
-                "   " + strings.mozilla_api.replace("$LINK$", `${SBT}MDN (${this.namespace} API) <${mdn_documentation_url}>${SBT}__`)
+                "   " + strings.mozilla_api
+                    .replace("$NAME$", this.namespace)
+                    .replace("$LINK$", `${SBT}MDN <${mdn_documentation_url}>${SBT}__`)
             ])
         }
 

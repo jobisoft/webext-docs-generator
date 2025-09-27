@@ -46,9 +46,16 @@ repository can be used to obtain a copy of the relevant files.
 
 .. toctree::
   :hidden:
-  :caption: API reference
+  :caption: Thunderbird API reference
   
-  {{API_LIST}}
+  {{THUNDERBIRD_API_LIST}}
+
+.. toctree::
+  :hidden:
+  :caption: Mozilla API reference
+  
+  {{MOZILLA_API_LIST}}
+
 
 Where to get help and more information
 ======================================

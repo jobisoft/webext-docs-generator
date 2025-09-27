@@ -75,6 +75,12 @@ if (!config.schemas || !config.output || !config.manifest_version) {
         }
     }
     const allNamespaces = [...namespaces.keys()];
+    const ownerNamespaces = Array.from(namespaces)
+        .map(([key, value]) => ({
+            name: key,
+            mozilla: value.some(e => e.annotations?.some(a => a.mdn_documentation_url))
+        }));
+
     await copyFolder(TEMPLATE_PATH, config.output);
     await replacePlaceholdersInFile(
         path.join(config.output, "index.rst"),
@@ -85,7 +91,8 @@ if (!config.schemas || !config.output || !config.manifest_version) {
                 "=".repeat(title.length),
             ],
             "{{VERSION_NOTE}}": [],
-            "{{API_LIST}}": allNamespaces.sort()
+            "{{THUNDERBIRD_API_LIST}}": ownerNamespaces.filter(e => e.mozilla == false).map(e => e.name).sort(),
+            "{{MOZILLA_API_LIST}}": ownerNamespaces.filter(e => e.mozilla == true).map(e => e.name).sort(),
         }
     );
     await replacePlaceholdersInFile(
