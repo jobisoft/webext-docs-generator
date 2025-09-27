@@ -1,5 +1,6 @@
 import { AdvancedArray, LevelState } from "./classes.mjs";
 import { fixMalformedClosingTags } from "./tools.mjs"
+import * as strings from "./strings.mjs";
 
 const DBT = "``";
 const SBT = "`";
@@ -976,6 +977,15 @@ export class Writer {
             ".. role:: code",
             "",
         ])
+
+        let mdn_documentation_url = this.apiSchema?.annotations?.find(e => e.mdn_documentation_url)?.mdn_documentation_url;
+        if (mdn_documentation_url) {
+            doc.append([
+                ".. hint::",
+                "",
+                "   " + strings.mozilla_api.replace("$LINK$", `${SBT}MDN (${this.namespace} API) <${mdn_documentation_url}>${SBT}__`)
+            ])
+        }
 
         doc.append(this.format_description(this.apiSchema));
 

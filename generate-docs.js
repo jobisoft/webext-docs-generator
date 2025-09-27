@@ -59,7 +59,9 @@ if (!config.schemas || !config.output || !config.manifest_version) {
     for (let schema of schemas) {
         if (["extension_types.json", "manifest.json", "types.json"].includes(schema.file)) {
             let data = schema.data.find(e => e.types);
-            data.types.forEach(t => globalTypes.set(`${data.namespace}.${t.id}`, t));
+            data.types.forEach(t => {
+                globalTypes.set(`${data.namespace}.${t.id}`, t)
+            });
             continue;
         }
         if (["experiments.json", "events.json"].includes(schema.file)) {
