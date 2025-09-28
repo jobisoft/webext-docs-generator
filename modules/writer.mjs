@@ -493,6 +493,11 @@ export class Writer {
             str = str.split(s).join(r);
         }
 
+        // Fix refs with stray () at the end.
+        str = str.replace(/\$\((ref:[^)]*?)\(\)\)/g, (match, p1) => {
+            console.warn('Found stray empty parentheses in ref:', match);
+            return `$(${p1})`;
+        });
         // Regex replacements
         str = str.replace(/\$\((ref:(.*?))\)/g, ":ref:`$2`");
         str = str.replace(/\$\((doc:(.*?))\)/g, ":doc:`$2`");
@@ -674,11 +679,11 @@ export class Writer {
         let usedPermissions = new AdvancedArray();
 
         for (const value of Array.from(this.foundPermissions).sort()) {
-            let description = strings.permission_descriptions[value] 
+            let description = strings.permission_descriptions[value]
                 || permissionStrings[value]
                 || (this.allNamespaces.includes(value) && strings.permission_descriptions["*"].replace("$NAME$", value))
                 || "";
-            
+
             if (!description) {
                 console.log("Missing permission description for", value)
             }
