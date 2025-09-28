@@ -25,7 +25,7 @@ export class AdvancedArray extends Array {
 
     addParagraph(paragraph) {
         if (!paragraph) return;
-        this.push(paragraph, "");
+        this.push("", paragraph, "");
     }
 
     addParagraphs(paragraphs) {

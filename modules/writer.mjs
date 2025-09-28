@@ -672,12 +672,20 @@ export class Writer {
         // Include all permissions used somewhere in this API.
         // TODO: SensitiveDataUpload
         let usedPermissions = new AdvancedArray();
+
         for (const value of Array.from(this.foundPermissions).sort()) {
+            let description = strings.permission_descriptions[value] 
+                || permissionStrings[value]
+                || (this.allNamespaces.includes(value) && strings.permission_descriptions["*"].replace("$NAME$", value))
+                || "";
+            
+            if (!description) {
+                console.log("Missing permission description for", value)
+            }
+
             usedPermissions.append(this.api_member({
                 name: `:permission:${SBT}${value}${SBT}`,
-                description: permissionStrings[value]
-                    ? [permissionStrings[value]]
-                    : []
+                description: [description]
             }));
         }
 
@@ -686,8 +694,9 @@ export class Writer {
             section.append(this.header_2("Permissions"));
             if (usedPermissions.length > 0) {
                 section.addParagraph(strings.permission_header)
+                section.append(usedPermissions);
+                section.addParagraph(strings.permission_warning)
             }
-            section.append(usedPermissions);
             section.append(manifestPermissions);
             this.sidebar.set("permissions", "  * `Permissions`_");
         }
