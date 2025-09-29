@@ -504,6 +504,17 @@ export class Writer {
             console.warn('Found stray empty parentheses in ref:', match);
             return `$(${p1})`;
         });
+        // Fix refs without namespace.
+        str = str.replace(/\$\((ref:([^)]+))\)/g, (match, fullRef, refName) => {
+            if (!refName.includes('.')) {
+                const fixed = `${this.namespace.split(".").at(0)}.${refName}`;
+                console.warn(`Ref missing dot, fixing ${refName} to ${fixed}`);
+                return `$(${fullRef.replace(refName, fixed)})`;
+            }
+            return match;
+        });
+
+
         // Regex replacements
         str = str.replace(/\$\((ref:(.*?))\)/g, ":ref:`$2`");
         str = str.replace(/\$\((doc:(.*?))\)/g, ":doc:`$2`");
@@ -543,24 +554,29 @@ export class Writer {
             return "`Port <https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/API/runtime/Port>`__";
         }
 
-        // Links to the same page do not need to provide a namespace.
-        if (ref.startsWith(`${this.namespace}.`)) {
-            ref = ref.slice(this.namespace.length + 1)
-        }
-        this.foundTypes.add(ref);
-
-        // Global types will be handled per API, locally.
-        for (let prefix of ["manifest.", "extensionTypes."]) {
+        // Local types (manifest and namespace) are logged without a leading
+        // namespace. The manifest namespace will later be replaced with the
+        // local namespace.
+        for (let prefix of ["manifest.", `${this.namespace}.`]) {
             if (ref.startsWith(prefix)) {
                 ref = ref.slice(prefix.length);
                 break;
             }
         }
+        this.foundTypes.add(ref);
+
+        // Global types will also be handled per API, locally.
+        for (let prefix of ["extensionTypes."]) {
+            if (ref.startsWith(prefix)) {
+                ref = ref.slice(prefix.length);
+                break;
+            }
+        }
+
         // Make sure the namespace is prefixed for local links.
         if (!ref.includes(".")) {
             ref = `${this.namespace}.${ref}`;
         }
-
 
         return `:ref:${SBT}${ref}${SBT}`;
     }
