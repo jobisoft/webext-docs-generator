@@ -448,6 +448,10 @@ export class Writer {
     }
 
     replace_code(str) {
+        if (!str) {
+            return str;
+        }
+
         // Fix malformed <val> and <var> tags where closing tag is missing
         str = fixMalformedClosingTags(str, ["val", "var", "code", "permission"]);
 
@@ -686,10 +690,13 @@ export class Writer {
                 let permissionName = parts[0]
                     .slice(25)
                     .replace(/-/g, ".")
-                    .trim();
-                // Remove any numbers from permissionName
-                permissionName = permissionName.replace(/[0-9]/g, "");
-                permissionStrings[permissionName] = parts[1].trim();
+                    .trim()
+                    .replace(/[0-9]/g, "");
+                let permissionDescription = parts[1].trim();
+                if (!permissionDescription.endsWith(".")) {
+                    permissionDescription = `${permissionDescription}.`
+                }
+                permissionStrings[permissionName] = permissionDescription;
             }
         }
 
@@ -701,7 +708,7 @@ export class Writer {
         let usedPermissions = new AdvancedArray();
 
         for (const value of Array.from(this.foundPermissions).sort()) {
-            let description = strings.permission_descriptions[value]
+            let description = this.replace_code(strings.permission_descriptions[value])
                 || permissionStrings[value]
                 || (this.allNamespaces.includes(value) && strings.permission_descriptions["*"].replace("$NAME$", value))
                 || "";
@@ -722,7 +729,13 @@ export class Writer {
             if (usedPermissions.length > 0) {
                 section.addParagraph(strings.permission_header)
                 section.append(usedPermissions);
-                section.addParagraph(strings.permission_warning)
+                section.append([
+                    "",
+                    ".. hint::",
+                    "",
+                    "   " + strings.permission_warning,
+                    ""
+                ])
             }
             section.append(manifestPermissions);
             this.sidebar.set("permissions", "  * `Permissions`_");
