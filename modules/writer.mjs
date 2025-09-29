@@ -766,7 +766,6 @@ export class Writer {
             section.append(this.header_2("Permissions"));
             if (usedPermissions.length > 0) {
                 section.addParagraph(strings.permission_header)
-                section.append(usedPermissions);
                 section.append([
                     "",
                     ".. hint::",
@@ -774,6 +773,7 @@ export class Writer {
                     "   " + strings.permission_warning,
                     ""
                 ])
+                section.append(usedPermissions);
             }
             section.append(manifestPermissions);
             this.sidebar.set("permissions", "  * `Permissions`_");
