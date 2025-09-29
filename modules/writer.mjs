@@ -869,6 +869,10 @@ export class Writer {
     }
 
     async generateTypesSection() {
+        // Add all types from the manifest and the api.
+        (this.manifestSchema.types || []).filter(e => e.id).forEach(e => this.foundTypes.add(e.id));
+        (this.apiSchema.types || []).filter(e => e.id).forEach(e => this.foundTypes.add(e.id));
+
         if (!this.foundTypes.size) {
             return null;
         }
