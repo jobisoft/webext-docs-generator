@@ -80,7 +80,7 @@ if (!config.schemas || !config.output || !config.manifest_version) {
             namespaces.set(name, namespace);
         }
     }
-    const allNamespaces = [...namespaces.keys()];
+    const allNamespaceNames = [...namespaces.keys()];
     const ownerNamespaces = Array.from(namespaces)
         .map(([key, value]) => ({
             name: key,
@@ -109,23 +109,24 @@ if (!config.schemas || !config.output || !config.manifest_version) {
         }
     );
 
-    for (let [namespace, schema] of namespaces) {
-        const apiSchema = schema.find(e => e.namespace == namespace);
+    for (let [namespaceName, schema] of namespaces) {
+        const apiSchema = schema.find(e => e.namespace == namespaceName);
         const manifestSchema = schema.find(e => e.namespace == "manifest");
 
         const writer = new Writer({
             config,
-            namespace,
+            namespaceName,
             apiSchema,
             manifestSchema,
             globalTypes,
-            allNamespaces,
+            allNamespaceNames,
             permissionLocales,
+            namespaces
         })
         const doc = await writer.generateApiDoc();
 
         await fs.writeFile(
-            path.join(config.output, `${namespace}.rst`),
+            path.join(config.output, `${namespaceName}.rst`),
             doc.toString(),
             "utf8"
         );

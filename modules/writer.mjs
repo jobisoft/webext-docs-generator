@@ -17,8 +17,11 @@ export class Writer {
         this.version_added_tracker = new LevelState()
     }
 
-    get namespace() {
-        return this.#options.namespace;
+    get namespaces() {
+        return this.#options.namespaces;
+    }
+    get namespaceName() {
+        return this.#options.namespaceName;
     }
     get apiSchema() {
         return this.#options.apiSchema;
@@ -32,8 +35,8 @@ export class Writer {
     get globalTypes() {
         return this.#options.globalTypes;
     }
-    get allNamespaces() {
-        return this.#options.allNamespaces;
+    get allNamespaceNames() {
+        return this.#options.allNamespaceNames;
     }
     get permissionLocales() {
         return this.#options.permissionLocales;
@@ -249,13 +252,13 @@ export class Writer {
             let text = "";
             if (entry.entries.length === 0) continue;
             else if (entry.entries.length === 1) {
-                text = entry.single.replace("%s", entry.entries[0]).replace("%s", this.namespace);
+                text = entry.single.replace("%s", entry.entries[0]).replace("%s", this.namespaceName);
             } else {
                 const last = entry.entries.pop();
                 text = entry.multiple
                     .replace("%s", entry.entries.join(", "))
                     .replace("%s", last)
-                    .replace("%s", this.namespace);
+                    .replace("%s", this.namespaceName);
             }
 
             section.append([
@@ -368,7 +371,7 @@ export class Writer {
         section.append(this.header_3(
             typeDef.id,
             {
-                label: `${this.namespace}.${typeDef.id}`,
+                label: `${this.namespaceName}.${typeDef.id}`,
                 info: this.format_addition(typeDef, 1)
             }
         ));
@@ -390,14 +393,14 @@ export class Writer {
 
                     for (const [key, value] of items) {
                         if (!value.optional) {
-                            content.append(this.reference(`${this.namespace}.${typeDef.id}.${key}`));
+                            content.append(this.reference(`${this.namespaceName}.${typeDef.id}.${key}`));
                             content.append(this.format_object(key, value));
                         }
                     }
 
                     for (const [key, value] of items) {
                         if (value.optional) {
-                            content.append(this.reference(`${this.namespace}.${typeDef.id}.${key}`));
+                            content.append(this.reference(`${this.namespaceName}.${typeDef.id}.${key}`));
                             content.append(this.format_object(key, value));
                         }
                     }
@@ -585,18 +588,37 @@ export class Writer {
             return "`Port <https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/API/runtime/Port>`__";
         }
 
-        const matchingNamespace = this.allNamespaces.find(e => ref.startsWith(`${e}.`));
+        const matchingNamespace = this.allNamespaceNames.find(e => ref.startsWith(`${e}.`));
         if (!matchingNamespace && !ADDITIONAL_TYPE_PREFIXES.some(e => ref.startsWith(e))) {
             if (!ref.includes(".")) {
                 // This is a local reference without using the local namespace.
-                ref = `${this.namespace}.${ref}`;
+                // It *could* however be a reference from a child namespace to
+                // the parent namespace or to any of the other child namespaces,
+                // and NOT to the current child namespace.
+                let fixedRef = `${this.namespaceName}.${ref}`;
+                const isLocal = (this.apiSchema.types || []).find(e => e.id && e.id == ref);
+                const rootNamespaceName = this.namespaceName.split(".").at(0);
+                if (!isLocal && rootNamespaceName != this.namespaceName) {
+                    const relatedNamespaceNames = [
+                        rootNamespaceName,
+                        ...this.allNamespaceNames.filter(e => e.startsWith(`${rootNamespaceName}.`))
+                    ];
+                    for (let relatedNamespaceName of relatedNamespaceNames) {
+                        const isRelated = (this.namespaces.get(relatedNamespaceName) || []).some(n => n.types && n.types.some(t => t.id == ref))
+                        if (isRelated) {
+                            fixedRef = `${relatedNamespaceName}.${ref}`;
+                            break;
+                        }
+                    }
+                }
+                ref = fixedRef;
             } else {
                 // This must be a nested namespace, which is using only its sub-
                 // namespace in the reference. Find the parent namespace. Examples:
                 // * addressBooks contacts.ContactNode
                 // * addressBooks mailingLists.MailingListNode
                 const subNameSpace = `.${ref.split(".").at(0)}`;
-                const parentNamespace = this.allNamespaces.find(e => e.endsWith(subNameSpace));
+                const parentNamespace = this.allNamespaceNames.find(e => e.endsWith(subNameSpace));
                 if (parentNamespace) {
                     ref = `${parentNamespace}.${ref.slice(subNameSpace.length)}`;
                 } else {
@@ -608,13 +630,13 @@ export class Writer {
         // Keep track of all used types, which have to be included on the local
         // API documentation. This will mostly be those from this API, but also
         // some global ones.
-        if (track && [`${this.namespace}.`, ...ADDITIONAL_TYPE_PREFIXES].some(e => ref.startsWith(e))) {
+        if (track && [`${this.namespaceName}.`, ...ADDITIONAL_TYPE_PREFIXES].some(e => ref.startsWith(e))) {
             this.foundTypes.add(ref);
         }
 
         // All needed types will be linked to the local API page.
         if (ADDITIONAL_TYPE_PREFIXES.some(e => ref.startsWith(e))) {
-            ref = [this.namespace, ...ref.split(".").slice(1)].join(".");
+            ref = [this.namespaceName, ...ref.split(".").slice(1)].join(".");
         }
 
         return `:ref:${SBT}${tools.escapeUppercase(ref)}${SBT}`;
@@ -745,7 +767,7 @@ export class Writer {
         for (const value of Array.from(this.foundPermissions).sort()) {
             let description = this.replace_code(strings.permission_descriptions[value])
                 || permissionStrings[value]
-                || (this.allNamespaces.includes(value) && strings.permission_descriptions["*"].replace("$NAME$", value))
+                || (this.allNamespaceNames.includes(value) && strings.permission_descriptions["*"].replace("$NAME$", value))
                 || "";
 
             if (!description) {
@@ -795,7 +817,7 @@ export class Writer {
             section.append(this.header_3(
                 `${obj.name}(${this.format_params(obj, { callback: obj.async })})`,
                 {
-                    label: `${this.namespace}.${obj.name}`,
+                    label: `${this.namespaceName}.${obj.name}`,
                     info: this.format_addition(obj, 1)
                 }
             ));
@@ -863,7 +885,7 @@ export class Writer {
             section.append(this.header_3(
                 `${event.name}`, // could also add params later: `${event.name}(${format_params(event)})`
                 {
-                    label: `${this.namespace}.${event.name}`,
+                    label: `${this.namespaceName}.${event.name}`,
                     info: this.format_addition(event, 1)
                 }
             ));
@@ -918,15 +940,15 @@ export class Writer {
 
     async generateTypesSection() {
         // Add all types from the manifest and the api.
-        (this.manifestSchema.types || []).filter(e => e.id).forEach(e => this.foundTypes.add(`${this.namespace}.${e.id}`));
-        (this.apiSchema.types || []).filter(e => e.id).forEach(e => this.foundTypes.add(`${this.namespace}.${e.id}`));
+        (this.manifestSchema.types || []).filter(e => e.id).forEach(e => this.foundTypes.add(`${this.namespaceName}.${e.id}`));
+        (this.apiSchema.types || []).filter(e => e.id).forEach(e => this.foundTypes.add(`${this.namespaceName}.${e.id}`));
 
         if (!this.foundTypes.size) {
             return null;
         }
 
         const strip_namespace_prefix = (ref) => {
-            const prefix = `${this.namespace}.`;
+            const prefix = `${this.namespaceName}.`;
             if (ref.startsWith(prefix)) {
                 return ref.slice(prefix.length);
             }
@@ -957,15 +979,15 @@ export class Writer {
                 // A simple startsWith() is not sufficient to determine if this
                 // is a local type or not. It could be for example addressBooks
                 // or addressBooks.contacts.
-                const bestNamespaceMatch = this.allNamespaces
+                const bestNamespaceMatch = this.allNamespaceNames
                     .filter(e => id.startsWith(`${e}.`))
                     .reduce((a, b) => (b.length > a.length ? b : a), "");
 
                 if (typeDef) {
                     definitions.set(typeDef.id, this.format_type(typeDef));
-                } else if (done && this.namespace == bestNamespaceMatch) {
+                } else if (done && this.namespaceName == bestNamespaceMatch) {
                     // We are done, but this is missing, log it.
-                    console.log(" - FIXME: Missing type definition", this.namespace, id)
+                    console.log(" - FIXME: Missing type definition", this.namespaceName, id)
                 };
             }
 
@@ -1008,7 +1030,7 @@ export class Writer {
 
             section.append(this.header_3(
                 key,
-                { label: `${this.namespace}.${key}` }
+                { label: `${this.namespaceName}.${key}` }
             ));
 
             if (property.description) {
@@ -1030,7 +1052,7 @@ export class Writer {
     }
 
     async generateApiDoc() {
-        const title = `${this.namespace} API`;
+        const title = `${this.namespaceName} API`;
         const doc = new AdvancedArray();
         const manifest = await this.generateManifestSection();
         const functions = await this.generateFunctionsSection();
@@ -1077,7 +1099,7 @@ export class Writer {
                 ".. hint::",
                 "",
                 "   " + strings.mozilla_api
-                    .replace("$NAME$", this.namespace)
+                    .replace("$NAME$", this.namespaceName)
                     .replace("$LINK$", `${SBT}MDN <${mdn_documentation_url}>${SBT}__`)
             ])
         }
