@@ -57,16 +57,22 @@ if (!config.schemas || !config.output || !config.manifest_version) {
     const namespaces = new Map();
     const globalTypes = new Map();
     for (let schema of schemas) {
-        if (["extension_types.json", "manifest.json", "types.json"].includes(schema.file)) {
+        // These are the additional type definitions, as noted in
+        // writer.mjs:ADDITIONAL_TYPE_PREFIXES.
+        if ([
+            "experiments.json",
+            "extension_types.json",
+            "manifest.json",
+            "types.json",
+            "events.json"
+        ].includes(schema.file)) {
             let data = schema.data.find(e => e.types);
             data.types.forEach(t => {
                 globalTypes.set(`${data.namespace}.${t.id}`, t)
             });
             continue;
         }
-        if (["experiments.json", "events.json"].includes(schema.file)) {
-            continue;
-        }
+
         const manifest = schema.data.find(e => e.namespace == "manifest")
         for (let entry of schema.data.filter(e => e.namespace != "manifest")) {
             const name = entry.namespace;

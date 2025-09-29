@@ -1,9 +1,10 @@
 import { AdvancedArray, LevelState } from "./classes.mjs";
-import { fixMalformedClosingTags } from "./tools.mjs"
+import * as tools from "./tools.mjs"
 import * as strings from "./strings.mjs";
 
 const DBT = "``";
 const SBT = "`";
+const ADDITIONAL_TYPE_PREFIXES = ["manifest.", "experiments.", "extensionTypes.", "events.", "types."];
 
 export class Writer {
     #options;
@@ -333,7 +334,7 @@ export class Writer {
         const dlEnumDescriptions = parseDLDescriptions(value.description);
         dlEnumDescriptions.forEach((enumDescription, enumName) => {
             if (!schema_annotations[enumName]) {
-                schema_annotations[enumName] = { "annotations" : [] }
+                schema_annotations[enumName] = { "annotations": [] }
             }
             schema_annotations[enumName].annotations.push({
                 "text": enumDescription
@@ -437,9 +438,6 @@ export class Writer {
             // into markdown bullet points and line breaks. Eventually, those
             // should be replaced by annotations.
             const desc = this.replace_code(obj.description.trim()).split("\n");
-            if (desc.length > 1) {
-                console.log(`Found description with <li> tags (converted to line breaks) in ${this.namespace} API`, desc)
-            }
             section.append("");
             section.append(desc);
             section.append("");
@@ -486,7 +484,7 @@ export class Writer {
         }
 
         // Fix malformed <val> and <var> tags where closing tag is missing
-        str = fixMalformedClosingTags(str, ["val", "var", "code", "permission"]);
+        str = tools.fixMalformedClosingTags(str, ["val", "var", "code", "permission"]);
 
         // Remove <code> inside <a>, as it is not render-able.
         str = str.replace(
@@ -542,24 +540,15 @@ export class Writer {
             str = str.split(s).join(r);
         }
 
-        // Fix refs with stray () at the end.
-        str = str.replace(/\$\((ref:[^)]*?)\(\)\)/g, (match, p1) => {
-            console.warn('Found stray empty parentheses in ref:', match);
-            return `$(${p1})`;
+        // Fix deprecated |..| notation for refs.
+        str = str.replace(/\|([^|]+)\|/g, '$(ref:$1)');
+        // Replace refs.
+        str = str.replace(/\$\(ref:(.*?)\)/g, (match, inner) => {
+            return this.format_link(inner
+                .replace(/\s+/g, "")  // remove any spaces inside
+                .replace(/\(\)$/, "") // remove trailing ()
+            );
         });
-        // Fix refs without namespace.
-        str = str.replace(/\$\((ref:([^)]+))\)/g, (match, fullRef, refName) => {
-            if (!refName.includes('.')) {
-                const fixed = `${this.namespace.split(".").at(0)}.${refName}`;
-                console.warn(`Ref missing dot, fixing ${refName} to ${fixed}`);
-                return `$(${fullRef.replace(refName, fixed)})`;
-            }
-            return match;
-        });
-
-
-        // Regex replacements
-        str = str.replace(/\$\((ref:(.*?))\)/g, ":ref:`$2`");
         str = str.replace(/\$\((doc:(.*?))\)/g, ":doc:`$2`");
         // Replace deprecated $(topic:...) references with their plain link text.
         str = str.replace(/\$\((topic:[^\)]+)\)\[(.*?)\]/g, "$2");
@@ -581,12 +570,12 @@ export class Writer {
         }
 
         return [
-            `.. _${label}:`,
+            `.. _${tools.escapeUppercase(label)}:`,
             ""
         ];
     }
 
-    format_link(ref) {
+    format_link(ref, track = false) {
         if (ref === "extensionTypes.File") {
             return "`File <https://developer.mozilla.org/en-US/docs/Web/API/File>`__";
         }
@@ -597,31 +586,39 @@ export class Writer {
             return "`Port <https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/API/runtime/Port>`__";
         }
 
-        // Local types (manifest and namespace) are logged without a leading
-        // namespace. The manifest namespace will later be replaced with the
-        // local namespace.
-        for (let prefix of ["manifest.", `${this.namespace}.`]) {
-            if (ref.startsWith(prefix)) {
-                ref = ref.slice(prefix.length);
-                break;
+        const matchingNamespace = this.allNamespaces.find(e => ref.startsWith(`${e}.`));
+        if (!matchingNamespace && !ADDITIONAL_TYPE_PREFIXES.some(e => ref.startsWith(e))) {
+            if (!ref.includes(".")) {
+                // This is a local reference without using the local namespace.
+                ref = `${this.namespace}.${ref}`;
+            } else {
+                // This must be a nested namespace, which is using only its sub-
+                // namespace in the reference. Find the parent namespace. Examples:
+                // * addressBooks contacts.ContactNode
+                // * addressBooks mailingLists.MailingListNode
+                const subNameSpace = `.${ref.split(".").at(0)}`;
+                const parentNamespace = this.allNamespaces.find(e => e.endsWith(subNameSpace));
+                if (parentNamespace) {
+                    ref = `${parentNamespace}.${ref.slice(subNameSpace.length)}`;
+                } else {
+                    console.log(" - FIXME: Unknown namespace", ref);
+                }
             }
         }
-        this.foundTypes.add(ref);
 
-        // Global types will also be handled per API, locally.
-        for (let prefix of ["extensionTypes."]) {
-            if (ref.startsWith(prefix)) {
-                ref = ref.slice(prefix.length);
-                break;
-            }
+        // Keep track of all used types, which have to be included on the local
+        // API documentation. This will mostly be those from this API, but also
+        // some global ones.
+        if (track && [`${this.namespace}.`, ...ADDITIONAL_TYPE_PREFIXES].some(e => ref.startsWith(e))) {
+            this.foundTypes.add(ref);
         }
 
-        // Make sure the namespace is prefixed for local links.
-        if (!ref.includes(".")) {
-            ref = `${this.namespace}.${ref}`;
+        // All needed types will be linked to the local API page.
+        if (ADDITIONAL_TYPE_PREFIXES.some(e => ref.startsWith(e))) {
+            ref = [this.namespace, ...ref.split(".").slice(1)].join(".");
         }
 
-        return `:ref:${SBT}${ref}${SBT}`;
+        return `:ref:${SBT}${tools.escapeUppercase(ref)}${SBT}`;
     }
 
     get_api_member_parts(name, value) {
@@ -691,7 +688,7 @@ export class Writer {
                 return obj.type;
             }
         } else if ("$ref" in obj) {
-            return this.format_link(obj["$ref"]);
+            return this.format_link(obj["$ref"], true);
         }
     }
 
@@ -753,7 +750,7 @@ export class Writer {
                 || "";
 
             if (!description) {
-                console.log("Missing permission description for", value)
+                console.log(" - FIXME: Missing permission description for", value)
             }
 
             usedPermissions.append(this.api_member({
@@ -922,49 +919,54 @@ export class Writer {
 
     async generateTypesSection() {
         // Add all types from the manifest and the api.
-        (this.manifestSchema.types || []).filter(e => e.id).forEach(e => this.foundTypes.add(e.id));
-        (this.apiSchema.types || []).filter(e => e.id).forEach(e => this.foundTypes.add(e.id));
+        (this.manifestSchema.types || []).filter(e => e.id).forEach(e => this.foundTypes.add(`${this.namespace}.${e.id}`));
+        (this.apiSchema.types || []).filter(e => e.id).forEach(e => this.foundTypes.add(`${this.namespace}.${e.id}`));
 
         if (!this.foundTypes.size) {
             return null;
         }
 
-        const prefix_namespace = (id) => {
-            if (id.startsWith(`${this.namespace}.`)) {
-                return id;
+        const strip_namespace_prefix = (ref) => {
+            const prefix = `${this.namespace}.`;
+            if (ref.startsWith(prefix)) {
+                return ref.slice(prefix.length);
             }
-            return `${this.namespace}.${id}`
+            return ref;
         }
-        const prefix_manifest = (id) => {
-            if (id.startsWith("`manifest.")) {
-                return id;
-            }
-            return `manifest.${id}`
-        }
+
         // We use a writer for each type definition, so we can add types as we go
         // and sort them at the end. We loop over foundTypes until it does not change
         // anymore (to find nested types).
-
-        // The collected types could be without namespace, which could either be
-        // manifest.* or namespace.*
         const definitions = new Map();
         let done = false;
-
         do {
             let prevFoundSize = this.foundTypes.size;
-            for (const id of [...this.foundTypes].filter(id => !definitions.has(id))) {
-
+            for (const id of [...this.foundTypes]) {
+                const strippedId = strip_namespace_prefix(id);
                 const typeDef =
                     this.globalTypes.get(id) ||
-                    this.globalTypes.get(`manifest.${id}`) ||
-                    (this.apiSchema.types && this.apiSchema.types.find(e => e.id && prefix_namespace(e.id) == prefix_namespace(id))) ||
-                    (this.manifestSchema.types && this.manifestSchema.types.find(e => e.id && prefix_manifest(e.id) == prefix_manifest(id)));
+                    // Some manifest namespaces are sadly not referenced as such,
+                    // but appear as local namespaces.
+                    this.globalTypes.get(`manifest.${strippedId}`) ||
+                    (this.apiSchema.types && this.apiSchema.types.find(e => e.id && e.id == strippedId)) ||
+                    (this.manifestSchema.types && this.manifestSchema.types.find(e => e.id && e.id == strippedId));
+
+                if (typeDef && definitions.has(typeDef.id)) {
+                    continue;
+                }
+
+                // A simple startsWith() is not sufficient to determine if this
+                // is a local type or not. It could be for example addressBooks
+                // or addressBooks.contacts.
+                const bestNamespaceMatch = this.allNamespaces
+                    .filter(e => id.startsWith(`${e}.`))
+                    .reduce((a, b) => (b.length > a.length ? b : a), "");
 
                 if (typeDef) {
-                    definitions.set(id, this.format_type(typeDef));
-                } else if (done && !id.includes(".")) {
+                    definitions.set(typeDef.id, this.format_type(typeDef));
+                } else if (done && this.namespace == bestNamespaceMatch) {
                     // We are done, but this is missing, log it.
-                    console.log("Missing Type", this.namespace, id)
+                    console.log(" - FIXME: Missing type definition", this.namespace, id)
                 };
             }
 

@@ -288,3 +288,9 @@ export function mergeSchema(entries, entry, manifest) {
 
   return entries;
 }
+
+// sphinx ignores uppercase letters, which can cause collisions if we have
+// entries which only differ by the casing (for example types and properties)
+export function escapeUppercase(str) {
+  return str.replace(/[A-Z]/g, match => "^" + match.toLowerCase());
+}
