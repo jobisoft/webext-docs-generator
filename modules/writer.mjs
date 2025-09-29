@@ -541,13 +541,12 @@ export class Writer {
         }
 
         // Fix deprecated |..| notation for refs.
-        str = str.replace(/\|([^|]+)\|/g, '$(ref:$1)');
+        str = str.replace(/\|([^|]+)\|/g, "$(ref:$1)");
+        // Fix trailing () at end of refs.
+        str = str.replace(/\$\(ref:(.*?)\(\)\)/g, "$(ref:$1)");
         // Replace refs.
         str = str.replace(/\$\(ref:(.*?)\)/g, (match, inner) => {
-            return this.format_link(inner
-                .replace(/\s+/g, "")  // remove any spaces inside
-                .replace(/\(\)$/, "") // remove trailing ()
-            );
+            return this.format_link(inner.replace(/\s+/g, "")) // remove any spaces inside
         });
         str = str.replace(/\$\((doc:(.*?))\)/g, ":doc:`$2`");
         // Replace deprecated $(topic:...) references with their plain link text.
