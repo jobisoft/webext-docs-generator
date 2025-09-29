@@ -534,7 +534,8 @@ export class Writer {
             "\\": "\\\\",
             // Some descriptions may use <li> tags, replace by bullet points and
             // actual line breaks.
-            "<li>": "\n\n * "
+            "<li>": "\n\n * ",
+            "<br>": " ",
         };
 
         for (const [s, r] of Object.entries(replacements)) {

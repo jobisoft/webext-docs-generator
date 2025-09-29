@@ -1,6 +1,6 @@
 export const mozilla_api = `The $NAME$ API is inherited from Firefox, and its primary documentation is maintained by Mozilla at $LINK$. Thunderbird implements only the subset of functions, events, and types listed here. The MDN pages may provide further details and examples, but they may also reference features that are not supported in Thunderbird.`
 
-export const permission_header = `The following permissions influence the behavior of the API: depending on which permissions are requested, additional methods might be available, or certain data may be included in responses.`
+export const permission_header = `The following permissions influence the behavior of the API. Depending on which permissions are requested, additional methods might be available, or certain data may be included in responses.`
 export const permission_warning = `Request permissions only when needed. Unnecessary requests may result in rejection during ATN review.`
 
 // TODO: Move these into an annotation.
