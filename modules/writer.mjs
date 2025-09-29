@@ -451,6 +451,12 @@ export class Writer {
         // Fix malformed <val> and <var> tags where closing tag is missing
         str = fixMalformedClosingTags(str, ["val", "var", "code", "permission"]);
 
+        // Remove <code> inside <a>, as it is not render-able.
+        str = str.replace(
+            /(<a .*?>)<code>(.*?)<\/code>(.*?<\/a>)/g,
+            '$1$2$3'
+        );
+
         const replacements = {
             "<em>": "*",
             "</em>": "*",
