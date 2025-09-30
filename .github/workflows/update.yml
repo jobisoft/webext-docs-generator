@@ -33,7 +33,7 @@ jobs:
       - name: Check out docs repo (with write token)
         uses: actions/checkout@v4
         with:
-          repository: thunderbird/webext-docs
+          repository: git@github.com:thunderbird/webext-docs.git
           path: docs
           ssh-key: ${{ secrets.DOC_REPO_DEPLOY_KEY }}
           ref: ${{ env.BRANCH }}
