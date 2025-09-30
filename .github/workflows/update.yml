@@ -30,14 +30,20 @@ jobs:
           ref: ${{ env.BRANCH }}
           fetch-depth: 1
 
-      - name: Checkout docs repo with SSH deploy key
-        uses: actions/checkout@v4
-        with:
-          repository: thunderbird/webext-docs
-          path: docs
-          ref: ${{ env.BRANCH }}
-          fetch-depth: 0
-          ssh-key: ${{ secrets.DOC_REPO_DEPLOY_KEY }}
+      - name: Set up SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DOC_REPO_DEPLOY_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan github.com >> ~/.ssh/known_hosts
+
+      - name: Clone docs repo
+        run: |
+          # Remove existing docs folder if it exists
+          rm -rf docs
+
+          # Clone the desired branch into docs/
+          git clone --branch ${{ env.BRANCH }} ssh://git@github.com:thunderbird/webext-docs.git docs
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -52,8 +58,7 @@ jobs:
         run: |
           node generate-docs.js --schemas=schemas/schema-files/ --output=docs/ --manifest_version=${{ inputs.manifestVersion }}
 
-      - name: Check for changes
-        id: git-check
+      - name: Commit and push changes
         working-directory: docs
         run: |
           git config user.name "github-actions[bot]"
@@ -61,15 +66,7 @@ jobs:
           git add .
           if git diff --cached --quiet; then
             echo "No changes to commit."
-            echo "changed=false" >> $GITHUB_OUTPUT
           else
-            echo "Changes detected."
-            echo "changed=true" >> $GITHUB_OUTPUT
+            git commit -m "Update WebExtension documentation (${{ env.BRANCH }})"
+            git push origin HEAD:${{ env.BRANCH }}
           fi
-
-      - name: Commit and push changes
-        if: steps.git-check.outputs.changed == 'true'
-        working-directory: docs
-        run: |
-          git commit -m "Update WebExtension documentation (${{ env.BRANCH }})"
-          git push origin HEAD:${{ env.BRANCH }}
