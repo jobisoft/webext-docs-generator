@@ -1,0 +1,54 @@
+name: Scheduled update of all WebExtension API documentation
+
+on:
+  schedule:
+    - cron: '0 2 * * 3'   # Runs every Wednesday at 2:00 AM UTC
+  workflow_dispatch:      # Allow manual trigger as well
+
+jobs:
+  update-docs-esr-mv2:
+    if: ${{ always() }}
+    uses: ./.github/workflows/update.yml
+    with:
+      release: esr
+      manifestVersion: 2
+
+  update-docs-esr-mv3:
+    if: ${{ always() }}
+    needs: update-docs-esr-mv2
+    uses: ./.github/workflows/update.yml
+    with:
+      release: esr
+      manifestVersion: 3
+
+  update-docs-release-mv2:
+    if: ${{ always() }}
+    needs: update-docs-esr-mv3
+    uses: ./.github/workflows/update.yml
+    with:
+      release: release
+      manifestVersion: 2
+
+  update-docs-release-mv3:
+    if: ${{ always() }}
+    needs: update-docs-release-mv2
+    uses: ./.github/workflows/update.yml
+    with:
+      release: release
+      manifestVersion: 3
+
+  update-docs-beta-mv2:
+    if: ${{ always() }}
+    needs: update-docs-release-mv3
+    uses: ./.github/workflows/update.yml
+    with:
+      release: beta
+      manifestVersion: 2
+
+  update-docs-beta-mv3:
+    if: ${{ always() }}
+    needs: update-docs-beta-mv2
+    uses: ./.github/workflows/update.yml
+    with:
+      release: beta
+      manifestVersion: 3
