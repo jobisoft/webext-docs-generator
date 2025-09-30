@@ -1,6 +1,13 @@
 import { promises as fs } from "fs";
 import path from "path";
 
+export function reportFixMeIfTriggered(value, ...info) {
+  if (value) {
+    console.log(" - FIXME:", ...info);
+  }
+  return value;
+}
+
 /**
  * Simple helper function to parse command line arguments.
  *

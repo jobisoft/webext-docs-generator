@@ -39,6 +39,15 @@ Options:
    --manifest_version         - ...
 `;
 
+let ADDITIONAL_TYPE_PREFIXES = [];
+const ADDITIONAL_TYPE_FILES = [
+    "experiments.json",
+    "extension_types.json",
+    "manifest.json",
+    "types.json",
+    "events.json"
+];
+
 const config = parseArgs();
 if (!config.schemas || !config.output || !config.manifest_version) {
     console.log(HELP_SCREEN);
@@ -49,45 +58,40 @@ if (!config.schemas || !config.output || !config.manifest_version) {
     const title = `WebExtension Documentation for Thunderbird ${thunderbird_version}`;
 
     // Read fluent strings for permissions.
-    let permissionLocales = await fs.readFile(path.join(config.schemas, `permissions.ftl`), "utf8");
+    let PERMISSION_LOCALES = await fs.readFile(path.join(config.schemas, `permissions.ftl`), "utf8");
 
     // Parent and Child implementations are in separate files and need to be
     // merged. Sub namespaces are in the same file and need to be separated.
     // Filter out global type definitions.
     const namespaces = new Map();
     const globalTypes = new Map();
+    const relatedNamespaceNames = new Map();
     for (let schema of schemas) {
-        // These are the additional type definitions, as noted in
-        // writer.mjs:ADDITIONAL_TYPE_PREFIXES.
-        if ([
-            "experiments.json",
-            "extension_types.json",
-            "manifest.json",
-            "types.json",
-            "events.json"
-        ].includes(schema.file)) {
+        if (ADDITIONAL_TYPE_FILES.includes(schema.file)) {
             let data = schema.data.find(e => e.types);
+            ADDITIONAL_TYPE_PREFIXES.push(data.namespace);
             data.types.forEach(t => {
                 globalTypes.set(`${data.namespace}.${t.id}`, t)
             });
             continue;
         }
 
-        const manifest = schema.data.find(e => e.namespace == "manifest")
-        for (let entry of schema.data.filter(e => e.namespace != "manifest")) {
+        const manifestNamespace = schema.data.find(e => e.namespace == "manifest");
+        const otherNamespaces = schema.data.filter(e => e.namespace != "manifest");
+        for (let entry of otherNamespaces) {
             const name = entry.namespace;
-            const namespace = mergeSchema(namespaces.get(name) ?? [], entry, manifest);
+            const namespace = mergeSchema(namespaces.get(name) ?? [], entry, manifestNamespace);
             namespaces.set(name, namespace);
         }
-    }
-    const allNamespaceNames = [...namespaces.keys()];
-    const ownerNamespaces = Array.from(namespaces)
-        .map(([key, value]) => ({
-            name: key,
-            mozilla: value.some(e => e.annotations?.some(a => a.mdn_documentation_url))
-        }));
 
+        const names = relatedNamespaceNames.get(schema.file) || [];
+        names.push(...otherNamespaces.map(e => e.namespace));
+        relatedNamespaceNames.set(schema.file, names);
+    }
+    
     await copyFolder(TEMPLATE_PATH, config.output);
+
+    const apiNames = [...namespaces.keys()]
     await replacePlaceholdersInFile(
         path.join(config.output, "index.rst"),
         {
@@ -97,8 +101,7 @@ if (!config.schemas || !config.output || !config.manifest_version) {
                 "=".repeat(title.length),
             ],
             "{{VERSION_NOTE}}": [],
-            "{{THUNDERBIRD_API_LIST}}": ownerNamespaces.filter(e => e.mozilla == false).map(e => e.name).sort(),
-            "{{MOZILLA_API_LIST}}": ownerNamespaces.filter(e => e.mozilla == true).map(e => e.name).sort(),
+            "{{API_LIST}}": apiNames.sort(),
         }
     );
     await replacePlaceholdersInFile(
@@ -110,18 +113,19 @@ if (!config.schemas || !config.output || !config.manifest_version) {
     );
 
     for (let [namespaceName, schema] of namespaces) {
-        const apiSchema = schema.find(e => e.namespace == namespaceName);
         const manifestSchema = schema.find(e => e.namespace == "manifest");
+        const namespaceSchema = schema.find(e => e.namespace == namespaceName);
 
         const writer = new Writer({
             config,
+            namespaces,
             namespaceName,
-            apiSchema,
+            namespaceSchema,
             manifestSchema,
             globalTypes,
-            allNamespaceNames,
-            permissionLocales,
-            namespaces
+            PERMISSION_LOCALES,
+            ADDITIONAL_TYPE_PREFIXES,
+            RELATED_NAMESPACE_NAMES: [...relatedNamespaceNames.values()].find(e => e.includes(namespaceName)),
         })
         const doc = await writer.generateApiDoc();
 

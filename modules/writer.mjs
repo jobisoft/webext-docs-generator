@@ -4,7 +4,6 @@ import * as strings from "./strings.mjs";
 
 const DBT = "``";
 const SBT = "`";
-const ADDITIONAL_TYPE_PREFIXES = ["manifest.", "experiments.", "extensionTypes.", "events.", "types."];
 
 export class Writer {
     #options;
@@ -17,31 +16,36 @@ export class Writer {
         this.version_added_tracker = new LevelState()
     }
 
-    get namespaces() {
-        return this.#options.namespaces;
+    get config() {
+        return this.#options.config;
     }
     get namespaceName() {
         return this.#options.namespaceName;
     }
-    get apiSchema() {
-        return this.#options.apiSchema;
+    get namespaceSchema() {
+        return this.#options.namespaceSchema;
     }
     get manifestSchema() {
         return this.#options.manifestSchema;
     }
-    get config() {
-        return this.#options.config;
+    get SCHEMAS() {
+        return this.#options.namespaces;
     }
-    get globalTypes() {
+    get TYPES() {
         return this.#options.globalTypes;
     }
-    get allNamespaceNames() {
-        return this.#options.allNamespaceNames;
+    get NAMESPACE_NAMES() {
+        return [...this.SCHEMAS.keys()]
     }
-    get permissionLocales() {
-        return this.#options.permissionLocales;
+    get RELATED_NAMESPACE_NAMES() {
+        return this.#options.RELATED_NAMESPACE_NAMES;
     }
-
+    get PERMISSION_LOCALES() {
+        return this.#options.PERMISSION_LOCALES;
+    }
+    get ADDITIONAL_TYPE_PREFIXES() {
+        return this.#options.ADDITIONAL_TYPE_PREFIXES;
+    }
     api_member({ name = null, type = null, annotation = null, description = [] } = {}) {
         const lines = [
             "",
@@ -235,8 +239,8 @@ export class Writer {
         };
 
         // Read globally required permissions first.
-        if (this.apiSchema?.permissions) {
-            const permissions = Array.from(new Set(this.apiSchema.permissions)).sort();
+        if (this.namespaceSchema?.permissions) {
+            const permissions = Array.from(new Set(this.namespaceSchema.permissions)).sort();
             for (const permission of permissions) {
                 if (!permission.startsWith("manifest:")) {
                     this.foundPermissions.add(permission);
@@ -278,7 +282,7 @@ export class Writer {
     format_required_permissions(obj) {
         // Merge globally required permissions and object-specific permissions
         const allPermissions = [
-            ...(this.apiSchema?.permissions || []),
+            ...(this.namespaceSchema?.permissions || []),
             ...(obj?.permissions || []),
         ];
         // Keep track of found permissions.
@@ -545,12 +549,10 @@ export class Writer {
 
         // Fix deprecated |..| notation for refs.
         str = str.replace(/\|([^|]+)\|/g, "$(ref:$1)");
-        // Fix trailing () at end of refs.
+        // Temporary: Fix trailing () at end of refs. 
         str = str.replace(/\$\(ref:(.*?)\(\)\)/g, "$(ref:$1)");
         // Replace refs.
-        str = str.replace(/\$\(ref:(.*?)\)/g, (match, inner) => {
-            return this.format_link(inner.replace(/\s+/g, "")) // remove any spaces inside
-        });
+        str = str.replace(/\$\(ref:(.*?)\)/g, (match, inner) => this.format_link(inner));
         str = str.replace(/\$\((doc:(.*?))\)/g, ":doc:`$2`");
         // Replace deprecated $(topic:...) references with their plain link text.
         str = str.replace(/\$\((topic:[^\)]+)\)\[(.*?)\]/g, "$2");
@@ -588,23 +590,17 @@ export class Writer {
             return "`Port <https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/API/runtime/Port>`__";
         }
 
-        const matchingNamespace = this.allNamespaceNames.find(e => ref.startsWith(`${e}.`));
-        if (!matchingNamespace && !ADDITIONAL_TYPE_PREFIXES.some(e => ref.startsWith(e))) {
+        const matchingNamespace = this.NAMESPACE_NAMES.find(e => ref.startsWith(`${e}.`));
+        if (!matchingNamespace && !this.ADDITIONAL_TYPE_PREFIXES.some(e => ref.startsWith(e))) {
             if (!ref.includes(".")) {
                 // This is a local reference without using the local namespace.
-                // It *could* however be a reference from a child namespace to
-                // the parent namespace or to any of the other child namespaces,
-                // and NOT to the current child namespace.
+                // It *could* however be a reference from/to a namespace defined
+                // in the same schema file. Check RELATED_NAMESPACE_NAMES!
                 let fixedRef = `${this.namespaceName}.${ref}`;
-                const isLocal = (this.apiSchema.types || []).find(e => e.id && e.id == ref);
-                const rootNamespaceName = this.namespaceName.split(".").at(0);
-                if (!isLocal && rootNamespaceName != this.namespaceName) {
-                    const relatedNamespaceNames = [
-                        rootNamespaceName,
-                        ...this.allNamespaceNames.filter(e => e.startsWith(`${rootNamespaceName}.`))
-                    ];
-                    for (let relatedNamespaceName of relatedNamespaceNames) {
-                        const isRelated = (this.namespaces.get(relatedNamespaceName) || []).some(n => n.types && n.types.some(t => t.id == ref))
+                const isLocal = (this.namespaceSchema.types || []).find(e => e.id && e.id == ref);
+                if (!isLocal && this.RELATED_NAMESPACE_NAMES.length > 1) {
+                    for (let relatedNamespaceName of this.RELATED_NAMESPACE_NAMES) {
+                        const isRelated = (this.SCHEMAS.get(relatedNamespaceName) || []).some(n => n.types && n.types.some(t => t.id == ref))
                         if (isRelated) {
                             fixedRef = `${relatedNamespaceName}.${ref}`;
                             break;
@@ -618,11 +614,11 @@ export class Writer {
                 // * addressBooks contacts.ContactNode
                 // * addressBooks mailingLists.MailingListNode
                 const subNameSpace = `.${ref.split(".").at(0)}`;
-                const parentNamespace = this.allNamespaceNames.find(e => e.endsWith(subNameSpace));
+                const parentNamespace = this.NAMESPACE_NAMES.find(e => e.endsWith(subNameSpace));
                 if (parentNamespace) {
                     ref = `${parentNamespace}.${ref.slice(subNameSpace.length)}`;
                 } else {
-                    console.log(" - FIXME: Unknown namespace", ref);
+                    tools.reportFixMeIfTriggered(true, "Unknown namespace", ref);
                 }
             }
         }
@@ -630,12 +626,12 @@ export class Writer {
         // Keep track of all used types, which have to be included on the local
         // API documentation. This will mostly be those from this API, but also
         // some global ones.
-        if (track && [`${this.namespaceName}.`, ...ADDITIONAL_TYPE_PREFIXES].some(e => ref.startsWith(e))) {
+        if (track && [`${this.namespaceName}.`, ...this.ADDITIONAL_TYPE_PREFIXES].some(e => ref.startsWith(e))) {
             this.foundTypes.add(ref);
         }
 
         // All needed types will be linked to the local API page.
-        if (ADDITIONAL_TYPE_PREFIXES.some(e => ref.startsWith(e))) {
+        if (this.ADDITIONAL_TYPE_PREFIXES.some(e => ref.startsWith(e))) {
             ref = [this.namespaceName, ...ref.split(".").slice(1)].join(".");
         }
 
@@ -741,7 +737,7 @@ export class Writer {
 
     async generatePermissionsSection() {
         let permissionStrings = {};
-        for (let line of this.permissionLocales.split("\n")) {
+        for (let line of this.PERMISSION_LOCALES.split("\n")) {
             if (line.startsWith("webext-perms-description")) {
                 let parts = line.split("=", 2);
                 let permissionName = parts[0]
@@ -767,11 +763,11 @@ export class Writer {
         for (const value of Array.from(this.foundPermissions).sort()) {
             let description = this.replace_code(strings.permission_descriptions[value])
                 || permissionStrings[value]
-                || (this.allNamespaceNames.includes(value) && strings.permission_descriptions["*"].replace("$NAME$", value))
+                || (this.NAMESPACE_NAMES.includes(value) && strings.permission_descriptions["*"].replace("$NAME$", value))
                 || "";
 
             if (!description) {
-                console.log(" - FIXME: Missing permission description for", value)
+                tools.reportFixMeIfTriggered(true, "Missing permission description for", value)
             }
 
             usedPermissions.append(this.api_member({
@@ -802,12 +798,12 @@ export class Writer {
     }
 
     async generateFunctionsSection() {
-        if (!Array.isArray(this.apiSchema.functions) || this.apiSchema.functions.length == 0) {
+        if (!Array.isArray(this.namespaceSchema.functions) || this.namespaceSchema.functions.length == 0) {
             return null;
         }
 
         const section = new AdvancedArray();
-        for (let obj of this.apiSchema.functions.sort((a, b) => a.name.localeCompare(b.name))) {
+        for (let obj of this.namespaceSchema.functions.sort((a, b) => a.name.localeCompare(b.name))) {
             // Skip if this function is not supported
             const { version_added } = obj?.annotations?.find(a => "version_added" in a) ?? {};
             if (version_added === false) {
@@ -871,12 +867,12 @@ export class Writer {
     }
 
     async generateEventsSection() {
-        if (!Array.isArray(this.apiSchema.events) || this.apiSchema.events.length == 0) {
+        if (!Array.isArray(this.namespaceSchema.events) || this.namespaceSchema.events.length == 0) {
             return null;
         }
 
         const section = new AdvancedArray();
-        for (let event of this.apiSchema.events.sort((a, b) => a.name.localeCompare(b.name))) {
+        for (let event of this.namespaceSchema.events.sort((a, b) => a.name.localeCompare(b.name))) {
             const { version_added } = event?.annotations?.find(a => "version_added" in a) ?? {};
             if (version_added === false) {
                 continue;
@@ -941,7 +937,7 @@ export class Writer {
     async generateTypesSection() {
         // Add all types from the manifest and the api.
         (this.manifestSchema.types || []).filter(e => e.id).forEach(e => this.foundTypes.add(`${this.namespaceName}.${e.id}`));
-        (this.apiSchema.types || []).filter(e => e.id).forEach(e => this.foundTypes.add(`${this.namespaceName}.${e.id}`));
+        (this.namespaceSchema.types || []).filter(e => e.id).forEach(e => this.foundTypes.add(`${this.namespaceName}.${e.id}`));
 
         if (!this.foundTypes.size) {
             return null;
@@ -964,13 +960,15 @@ export class Writer {
             let prevFoundSize = this.foundTypes.size;
             for (const id of [...this.foundTypes]) {
                 const strippedId = strip_namespace_prefix(id);
-                const typeDef =
-                    this.globalTypes.get(id) ||
-                    // Some manifest namespaces are sadly not referenced as such,
-                    // but appear as local namespaces.
-                    this.globalTypes.get(`manifest.${strippedId}`) ||
-                    (this.apiSchema.types && this.apiSchema.types.find(e => e.id && e.id == strippedId)) ||
-                    (this.manifestSchema.types && this.manifestSchema.types.find(e => e.id && e.id == strippedId));
+                const typeDef = this.TYPES.get(id)
+                    || (this.namespaceSchema.types && this.namespaceSchema.types.find(e => e.id && e.id == strippedId))
+                    || (this.manifestSchema.types && this.manifestSchema.types.find(e => e.id && e.id == strippedId))
+                    // Some manifest types are sadly not referenced as such,
+                    // but appear as local types.
+                    || tools.reportFixMeIfTriggered(this.TYPES.get(`manifest.${strippedId}`), "Missing manifest prefix in reference", this.namespaceName, strippedId)
+                    // Some extensionTypes types are sadly not referenced as such,
+                    // but appear as local types (needs to be checked last!).
+                    || tools.reportFixMeIfTriggered(this.TYPES.get(`extensionTypes.${strippedId}`), "Missing extensionTypes prefix in reference", this.namespaceName, strippedId);
 
                 if (typeDef && definitions.has(typeDef.id)) {
                     continue;
@@ -979,7 +977,7 @@ export class Writer {
                 // A simple startsWith() is not sufficient to determine if this
                 // is a local type or not. It could be for example addressBooks
                 // or addressBooks.contacts.
-                const bestNamespaceMatch = this.allNamespaceNames
+                const bestNamespaceMatch = this.NAMESPACE_NAMES
                     .filter(e => id.startsWith(`${e}.`))
                     .reduce((a, b) => (b.length > a.length ? b : a), "");
 
@@ -987,7 +985,7 @@ export class Writer {
                     definitions.set(typeDef.id, this.format_type(typeDef));
                 } else if (done && this.namespaceName == bestNamespaceMatch) {
                     // We are done, but this is missing, log it.
-                    console.log(" - FIXME: Missing type definition", this.namespaceName, id)
+                    tools.reportFixMeIfTriggered(true, "Missing type definition", this.namespaceName, id)
                 };
             }
 
@@ -1015,13 +1013,13 @@ export class Writer {
     }
 
     async generatePropertiesSection() {
-        if (!this.apiSchema.properties) {
+        if (!this.namespaceSchema.properties) {
             return null;
         }
 
         const section = new AdvancedArray();
-        for (let key of Object.keys(this.apiSchema.properties).sort((a, b) => a.localeCompare(b))) {
-            const property = this.apiSchema.properties[key];
+        for (let key of Object.keys(this.namespaceSchema.properties).sort((a, b) => a.localeCompare(b))) {
+            const property = this.namespaceSchema.properties[key];
 
             const { version_added } = property?.annotations?.find(a => "version_added" in a) ?? {};
             if (version_added === false) {
@@ -1093,7 +1091,7 @@ export class Writer {
             "",
         ])
 
-        let mdn_documentation_url = this.apiSchema?.annotations?.find(e => e.mdn_documentation_url)?.mdn_documentation_url;
+        let mdn_documentation_url = this.namespaceSchema?.annotations?.find(e => e.mdn_documentation_url)?.mdn_documentation_url;
         if (mdn_documentation_url) {
             doc.append([
                 ".. hint::",
@@ -1104,7 +1102,7 @@ export class Writer {
             ])
         }
 
-        doc.append(this.format_description(this.apiSchema));
+        doc.append(this.format_description(this.namespaceSchema));
 
         doc.addSection(manifest);
         doc.addSection(permissions);
