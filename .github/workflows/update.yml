@@ -28,16 +28,16 @@ jobs:
           repository: thunderbird/webext-annotated-schemas
           path: schemas
           ref: ${{ env.BRANCH }}
-          fetch-depth: 1     # shallow clone, only the last commit
+          fetch-depth: 1
 
-      - name: Check out docs repo (with write token)
+      - name: Checkout docs repo with SSH deploy key
         uses: actions/checkout@v4
         with:
-          repository: ssh://git@github.com/thunderbird/webext-docs.git
+          repository: thunderbird/webext-docs
           path: docs
-          ssh-key: ${{ secrets.DOC_REPO_DEPLOY_KEY }}
           ref: ${{ env.BRANCH }}
-          fetch-depth: 0     # full clone
+          fetch-depth: 0
+          ssh-key: ${{ secrets.DOC_REPO_DEPLOY_KEY }}
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
