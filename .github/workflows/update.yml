@@ -11,6 +11,9 @@ on:
         required: true
         type: string
         default: 3
+    secrets:
+      DOC_REPO_DEPLOY_KEY: 
+        required: true
 
 jobs:
   update-schema:
