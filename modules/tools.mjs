@@ -177,16 +177,6 @@ function escapeRegex(str) {
 }
 
 /**
- * Checks if a value is a plain object (literal object).
- *
- * @param {*} a - Value to test
- * @returns {boolean} True if a is a plain object
- */
-function isPlainObject(a) {
-  return Object.prototype.toString.call(a) === "[object Object]";
-}
-
-/**
  * Replace placeholders in a file, keeping the existing indentation.
  *
  * @param {string} filename - Path to the file
@@ -208,6 +198,34 @@ export async function replacePlaceholdersInFile(filename, replacements) {
   await fs.writeFile(filename, content, "utf8");
 }
 
+const stableStringify = (obj) => {
+  switch (getType(obj)) {
+    case "primitive":
+      return String(obj);
+    case "array":
+      return "[" + obj.map(stableStringify).join(",") + "]";
+    case "object":
+      return "{" + Object.keys(obj).sort()
+        .map(k => JSON.stringify(k) + ":" + stableStringify(obj[k]))
+        .join(",") + "}";
+  }
+}
+
+const isEqual = (a, b) => {
+  if (a === b) return true;
+  return stableStringify(a) === stableStringify(b);
+}
+
+const getType = (v) => {
+  if (v === null || typeof v !== "object") {
+    return "primitive";
+  }
+  if (Array.isArray(v)) {
+    return "array"
+  }
+  return "object"
+}
+
 /**
  * Merges a schema entry and a manifest into an existing entries array.
  *
@@ -217,29 +235,9 @@ export async function replacePlaceholdersInFile(filename, replacements) {
  * @returns {Array<object>} Updated entries array
  */
 export function mergeSchema(entries, entry, manifest) {
-  const stableStringify = (obj) => {
-    if (obj === null || typeof obj !== "object") {
-      return String(obj); // primitives
-    }
-
-    if (Array.isArray(obj)) {
-      return "[" + obj.map(stableStringify).join(",") + "]";
-    }
-
-    // object: sort keys
-    return "{" + Object.keys(obj).sort()
-      .map(k => JSON.stringify(k) + ":" + stableStringify(obj[k]))
-      .join(",") + "}";
-  }
-
-  const isEqual = (a, b) => {
-    if (a === b) return true;
-    return stableStringify(a) === stableStringify(b);
-  }
-
   const subMerge = (a, b) => { // b into a
     for (let entry of Object.keys(b)) {
-      if (typeof b[entry] === "string") {
+      if (getType(b[entry]) == "primitive") {
         // Add/overwrite it (should not be different).
         a[entry] = b[entry];
         continue;
@@ -253,12 +251,12 @@ export function mergeSchema(entries, entry, manifest) {
           a[entry] = b[entry];
           continue;
         }
-        if (typeof b[entry][0] === "string") {
+        if (getType(b[entry][0]) == "primitive") {
           // Merge, but ensure uniqueness.
           a[entry] = [...new Set([...a[entry], ...b[entry]])];
           continue;
         }
-        if (isPlainObject(b[entry][0]) && Array.isArray(a[entry])) {
+        if (getType(b[entry][0]) == "object" && getType(a[entry]) == "array") {
           // Merge, but skip existing entries.
           a[entry].push(
             ...b[entry].filter(bItem =>
@@ -287,6 +285,87 @@ export function mergeSchema(entries, entry, manifest) {
   }
 
   return entries;
+}
+
+/**
+ * Merges src into dest.
+ *
+ * @param {object} dstObject - existing object
+ * @param {object} srcObject - object to merge into the existing object
+ */
+export function mergeSchemaExtensions(dstObject, srcObject) {
+
+  const mergeArray = (a, b) => { // b into a
+    a.push(...b.filter(
+      bItem => !a.some(aItem => isEqual(aItem, bItem))
+    ));
+  }
+
+  function mergeChoice(a, b, type) {
+    let bEntries = b.choices.filter(e => e[type]);
+    for (let bEntry of bEntries) {
+      let aEntries = a.choices.filter(e => e[type]);
+      if (aEntries.length == 0) {
+        a.choices.push(bEntry);
+        continue;
+      }
+
+      // Try to merge into an identical one.
+      let aEntry = aEntries.find(a => isEqual(a[type], bEntry[type]))
+        || aEntries[0];
+
+      switch (getType(bEntry)) {
+        case "primitive":
+          // skip, do not modify primitives
+          break;
+        case "array":
+          mergeArray(aEntry, bEntry);
+          break;
+        case "object":
+          mergeObject(aEntry, bEntry);
+          break;
+      }
+    }
+  }
+
+  const mergeObject = (a, b) => { // b into a
+    if (!a) {
+      a = {}
+    }
+
+    for (let key of [...Object.keys(b)]) {
+      if (key == "$extend") {
+        continue;
+      }
+
+      if (Object.hasOwn(a, key)) {
+        switch (getType(a[key])) {
+          case "primitive":
+            a[key] = b[key];
+            break;
+          case "array":
+            if (key == "choices") {
+              // choices need special handling
+              mergeChoice(a, b, "enum");
+              mergeChoice(a, b, "$ref");
+            } else {
+              // Add entries, but skip existing.
+              mergeArray(a[key], b[key]);
+            }
+            break;
+          case "object":
+            mergeObject(a[key], b[key]);
+            break;
+        }
+      } else {
+        // Add.
+        a[key] = b[key]
+      }
+    }
+    return a;
+  }
+
+  return mergeObject(dstObject, srcObject);
 }
 
 // sphinx ignores uppercase letters, which can cause collisions if we have

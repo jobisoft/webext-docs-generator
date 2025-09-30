@@ -10,14 +10,7 @@
  * Diff between MailExtension APIs and WebExtension APIs
  */
 
-import {
-    copyFolder,
-    getSchemaFiles,
-    mergeSchema,
-    parseArgs,
-    replacePlaceholdersInFile,
-} from './modules/tools.mjs';
-
+import * as tools from './modules/tools.mjs';
 import { Writer } from './modules/writer.mjs';
 
 import { promises as fs } from "fs";
@@ -49,12 +42,12 @@ const ADDITIONAL_TYPE_FILES = [
     "events.json"
 ];
 
-const config = parseArgs();
+const config = tools.parseArgs();
 if (!config.schemas || !config.output || !config.manifest_version) {
     console.log(HELP_SCREEN);
 } else {
     // Clone template folder and adjust cloned files.
-    const schemas = await getSchemaFiles(config.schemas);
+    const schemas = await tools.getSchemaFiles(config.schemas);
     const thunderbird_version = schemas.map(a => a.data.map(e => e.applicationVersion).filter(Boolean)).flat().pop();
     const title = `WebExtension Documentation for Thunderbird ${thunderbird_version}`;
 
@@ -81,7 +74,7 @@ if (!config.schemas || !config.output || !config.manifest_version) {
         const otherNamespaces = schema.data.filter(e => e.namespace != "manifest");
         for (let entry of otherNamespaces) {
             const name = entry.namespace;
-            const namespace = mergeSchema(namespaces.get(name) ?? [], entry, manifestNamespace);
+            const namespace = tools.mergeSchema(namespaces.get(name) ?? [], entry, manifestNamespace);
             namespaces.set(name, namespace);
         }
 
@@ -89,11 +82,11 @@ if (!config.schemas || !config.output || !config.manifest_version) {
         names.push(...otherNamespaces.map(e => e.namespace));
         relatedNamespaceNames.set(schema.file, names);
     }
-    
-    await copyFolder(TEMPLATE_PATH, config.output);
+
+    await tools.copyFolder(TEMPLATE_PATH, config.output);
 
     const apiNames = [...namespaces.keys()]
-    await replacePlaceholdersInFile(
+    await tools.replacePlaceholdersInFile(
         path.join(config.output, "index.rst"),
         {
             "{{TITLE}}": [
@@ -105,13 +98,30 @@ if (!config.schemas || !config.output || !config.manifest_version) {
             "{{API_LIST}}": apiNames.sort(),
         }
     );
-    await replacePlaceholdersInFile(
+    await tools.replacePlaceholdersInFile(
         path.join(config.output, "conf.py"),
         {
             "{{TITLE}}":
                 [`${title}<br><br>Manifest V${config.manifest_version}`],
         }
     );
+
+    // First loop over manifest schemas to extract extends and update the global
+    // manifest schema.
+    for (let [namespaceName, schema] of namespaces) {
+        const manifestSchema = schema.find(e => e.namespace == "manifest");
+        for (let localDefinition of (manifestSchema.types || [])) {
+            let extend = localDefinition["$extend"];
+            // We only care about extends here. There *are* manifests which also
+            // add local types to the global manifest (Theme), but we use the local
+            // manifest for the individual API generations.
+            if (extend) {
+                let globalDefinition = globalTypes.get(`manifest.${extend}`);
+                globalDefinition = tools.mergeSchemaExtensions(globalDefinition, localDefinition);
+                globalTypes.set(`manifest.${extend}`, globalDefinition);
+            }
+        }
+    }
 
     for (let [namespaceName, schema] of namespaces) {
         const manifestSchema = schema.find(e => e.namespace == "manifest");
