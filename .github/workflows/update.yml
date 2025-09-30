@@ -45,6 +45,11 @@ jobs:
           echo "Checking key format:"
           file ~/.ssh/id_rsa
 
+          echo "Key begins with:"
+          head -n 1 <<< "${{ secrets.DOC_REPO_DEPLOY_KEY }}"
+          echo "Key ends with:"
+          tail -n 1 <<< "${{ secrets.DOC_REPO_DEPLOY_KEY }}"
+
           echo "Testing SSH connection to GitHub:"
           ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -T git@github.com || true
 
