@@ -155,7 +155,11 @@ export class Writer {
 
     format_addition(obj, depth) {
         const { version_added } = obj?.annotations?.find(a => "version_added" in a) ?? {};
-        if (version_added && this.version_added_tracker.isDifferentFromParent(depth, version_added)) {
+        if (
+            version_added &&
+            typeof version_added === 'string' &&
+            this.version_added_tracker.isDifferentFromParent(depth, version_added)
+        ) {
             return `-- [Added in TB ${version_added}]`;
         }
         return "";
