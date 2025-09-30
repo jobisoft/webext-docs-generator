@@ -37,6 +37,17 @@ jobs:
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan github.com >> ~/.ssh/known_hosts
 
+      - name: Debug SSH key setup
+        run: |
+          echo "Listing SSH files:"
+          ls -l ~/.ssh
+
+          echo "Checking key format:"
+          file ~/.ssh/id_rsa
+
+          echo "Testing SSH connection to GitHub:"
+          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -T git@github.com || true
+
       - name: Clone docs repo
         run: |
           # Remove existing docs folder if it exists
