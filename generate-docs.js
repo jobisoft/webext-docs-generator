@@ -6,10 +6,6 @@
  * Author: John Bieling
  */
 
-/** TODO:
- * Diff between MailExtension APIs and WebExtension APIs
- */
-
 import * as tools from './modules/tools.mjs';
 import { Writer } from './modules/writer.mjs';
 
