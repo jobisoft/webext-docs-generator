@@ -37,6 +37,7 @@ Options:
                                 files. All existing files in that folder will be
                                 deleted.
    --manifest_version         - ...
+   --report_errors            - report errors in the schema files
 `;
 
 let ADDITIONAL_TYPE_PREFIXES = [];

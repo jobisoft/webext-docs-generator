@@ -46,6 +46,14 @@ export class Writer {
     get ADDITIONAL_TYPE_PREFIXES() {
         return this.#options.ADDITIONAL_TYPE_PREFIXES;
     }
+
+    reportFixMeIfTriggered(value, ...info) {
+        if (value && this.config.report_errors) {
+            console.log(" - FIXME:", ...info);
+        }
+        return value;
+    }
+
     api_member({ name = null, type = null, annotation = null, description = [] } = {}) {
         const lines = [
             "",
@@ -592,35 +600,33 @@ export class Writer {
 
         const matchingNamespace = this.NAMESPACE_NAMES.find(e => ref.startsWith(`${e}.`));
         if (!matchingNamespace && !this.ADDITIONAL_TYPE_PREFIXES.some(e => ref.startsWith(e))) {
-            if (!ref.includes(".")) {
-                // This is a local reference without using the local namespace.
-                // It *could* however be a reference from/to a namespace defined
-                // in the same schema file. Check RELATED_NAMESPACE_NAMES!
-                let fixedRef = `${this.namespaceName}.${ref}`;
-                const isLocal = (this.namespaceSchema.types || []).find(e => e.id && e.id == ref);
-                if (!isLocal && this.RELATED_NAMESPACE_NAMES.length > 1) {
-                    for (let relatedNamespaceName of this.RELATED_NAMESPACE_NAMES) {
-                        const isRelated = (this.SCHEMAS.get(relatedNamespaceName) || []).some(n => n.types && n.types.some(t => t.id == ref))
-                        if (isRelated) {
-                            fixedRef = `${relatedNamespaceName}.${ref}`;
-                            break;
-                        }
+            let strippedRef = ref.split(".").at(-1);
+            // This is a reference using no namespace or the wrong namespace.
+            // 1. It may just be a local reference:
+            //    * Window instead of Windows.Window
+            // 2. It may aim at a non-local namespace defined in the same file:
+            //    * MailingListNode used in contacts.*
+            // 3. It may not specifying the full path, skipping the top level:
+            //    * mailingList.MailingListNode instead of
+            //      addressBooks.mailingList.MailingListNode
+            //
+            // Check RELATED_NAMESPACE_NAMES!
+            let fixedRef = `${this.namespaceName}.${strippedRef}`;
+            const isLocal = (this.namespaceSchema.types || []).find(e => e.id && e.id == strippedRef);
+            if (!isLocal && this.RELATED_NAMESPACE_NAMES.length > 1) {
+                let isRelated = false;
+                for (let relatedNamespaceName of this.RELATED_NAMESPACE_NAMES) {
+                    isRelated = (this.SCHEMAS.get(relatedNamespaceName) || []).some(n => n.types && n.types.some(t => t.id == strippedRef))
+                    if (isRelated) {
+                        fixedRef = `${relatedNamespaceName}.${strippedRef}`;
+                        break;
                     }
                 }
-                ref = fixedRef;
-            } else {
-                // This must be a nested namespace, which is using only its sub-
-                // namespace in the reference. Find the parent namespace. Examples:
-                // * addressBooks contacts.ContactNode
-                // * addressBooks mailingLists.MailingListNode
-                const subNameSpace = `.${ref.split(".").at(0)}`;
-                const parentNamespace = this.NAMESPACE_NAMES.find(e => e.endsWith(subNameSpace));
-                if (parentNamespace) {
-                    ref = `${parentNamespace}.${ref.slice(subNameSpace.length)}`;
-                } else {
-                    tools.reportFixMeIfTriggered(true, "Unknown namespace", ref);
+                if (!isRelated) {
+                    this.reportFixMeIfTriggered(true, "Unknown namespace", ref);
                 }
             }
+            ref = fixedRef;
         }
 
         // Keep track of all used types, which have to be included on the local
@@ -767,7 +773,7 @@ export class Writer {
                 || "";
 
             if (!description) {
-                tools.reportFixMeIfTriggered(true, "Missing permission description for", value)
+                this.reportFixMeIfTriggered(true, "Missing permission description for", value)
             }
 
             usedPermissions.append(this.api_member({
@@ -965,10 +971,10 @@ export class Writer {
                     || (this.manifestSchema.types && this.manifestSchema.types.find(e => e.id && e.id == strippedId))
                     // Some manifest types are sadly not referenced as such,
                     // but appear as local types.
-                    || tools.reportFixMeIfTriggered(this.TYPES.get(`manifest.${strippedId}`), "Missing manifest prefix in reference", this.namespaceName, strippedId)
+                    || this.reportFixMeIfTriggered(this.TYPES.get(`manifest.${strippedId}`), "Missing manifest prefix in reference", this.namespaceName, strippedId)
                     // Some extensionTypes types are sadly not referenced as such,
                     // but appear as local types (needs to be checked last!).
-                    || tools.reportFixMeIfTriggered(this.TYPES.get(`extensionTypes.${strippedId}`), "Missing extensionTypes prefix in reference", this.namespaceName, strippedId);
+                    || this.reportFixMeIfTriggered(this.TYPES.get(`extensionTypes.${strippedId}`), "Missing extensionTypes prefix in reference", this.namespaceName, strippedId);
 
                 if (typeDef && definitions.has(typeDef.id)) {
                     continue;
@@ -985,7 +991,7 @@ export class Writer {
                     definitions.set(typeDef.id, this.format_type(typeDef));
                 } else if (done && this.namespaceName == bestNamespaceMatch) {
                     // We are done, but this is missing, log it.
-                    tools.reportFixMeIfTriggered(true, "Missing type definition", this.namespaceName, id)
+                    this.reportFixMeIfTriggered(true, "Missing type definition", this.namespaceName, id)
                 };
             }
 
