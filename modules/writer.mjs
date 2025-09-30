@@ -361,22 +361,25 @@ export class Writer {
         })
 
         const enum_lines = [""];
-        enum_lines.push("Supported values:");
+        if (value.enum.length == 0) {
+            enum_lines.push("No supported values.");
+        } else {
+            enum_lines.push("Supported values:");
+            for (const enum_value of value.enum.sort()) {
+                let enum_annotation = null;
+                let enum_description = null;
 
-        for (const enum_value of value.enum) {
-            let enum_annotation = null;
-            let enum_description = null;
+                if (schema_annotations?.[enum_value]) {
+                    enum_annotation = this.format_addition(schema_annotations[enum_value], 3);
+                    enum_description = this.format_description(schema_annotations[enum_value]);
+                }
 
-            if (schema_annotations?.[enum_value]) {
-                enum_annotation = this.format_addition(schema_annotations[enum_value], 3);
-                enum_description = this.format_description(schema_annotations[enum_value]);
+                enum_lines.push(...this.api_member({
+                    name: `:value:${SBT}${enum_value}${SBT}`,
+                    annotation: enum_annotation,
+                    description: enum_description
+                }));
             }
-
-            enum_lines.push(...this.api_member({
-                name: `:value:${SBT}${enum_value}${SBT}`,
-                annotation: enum_annotation,
-                description: enum_description
-            }));
         }
 
         return enum_lines;
@@ -433,7 +436,7 @@ export class Writer {
             let first = true;
             for (const choice of typeDef.choices) {
                 if (!first) {
-                    section.push("", "OR", "");
+                    section.push("", "*or*", "");
                 }
                 first = false;
                 section.append(this.api_header(
