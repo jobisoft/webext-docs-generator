@@ -43,7 +43,7 @@ jobs:
           rm -rf docs
 
           # Clone the desired branch into docs/
-          git clone --branch ${{ env.BRANCH }} ssh://git@github.com:thunderbird/webext-docs.git docs
+          git clone --branch ${{ env.BRANCH }} git@github.com:thunderbird/webext-docs.git docs
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
