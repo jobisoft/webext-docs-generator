@@ -12,6 +12,8 @@ jobs:
     with:
       release: esr
       manifestVersion: 2
+    secrets:
+      DOC_REPO_DEPLOY_KEY: ${{ secrets.DOC_REPO_DEPLOY_KEY }}
 
   # update-docs-esr-mv3:
   #   if: ${{ always() }}
