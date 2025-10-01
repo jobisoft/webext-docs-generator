@@ -19,7 +19,7 @@ Script to generate Thunderbird WebExtension API documentation in reStructuredTex
 
 ## 📝 Template support
 
-The files in the template folder are copied verbatim into the root folder of the generated output, but support a `{{CONDITION}}` tag. It allows to include or exclude portions of text in template files based on runtime conditions, such as manifest version or product version.
+The files in the template folder are copied verbatim into the root folder of the generated output, but support a `{{CONDITION}}` tag. It allows to include or exclude portions of text in template files (`*.rst` files and `conf.py`) based on runtime conditions, such as manifest version or product version. 
 
 ### Syntax
 
