@@ -39,9 +39,18 @@ const ADDITIONAL_TYPE_FILES = [
 ];
 
 const TITLE_DATA = {
-    "release": "",
-    "esr": "ESR ",
-    "beta": "BETA "
+    "release": {
+        prefix: "",
+        slug: "",
+    },
+    "esr": {
+        prefix: "ESR ",
+        slug: "esr-",
+    },
+    "beta": {
+        prefix: "BETA ",
+        slug: "beta-",
+    },
 }
 
 const config = tools.parseArgs();
@@ -51,11 +60,11 @@ if (!config.schemas || !config.output || !config.manifest_version) {
     // Clone template folder and adjust cloned files.
     const schemas = await tools.getSchemaFiles(config.schemas);
     const thunderbird_version = schemas.map(a => a.data.map(e => e.applicationVersion).filter(Boolean)).flat().pop();
-    let prefix = "release";
-    if (thunderbird_version.includes("esr")) prefix = "esr";
-    if (thunderbird_version.includes("b")) prefix = "beta";
-    const title = `WebExtension APIs for Thunderbird ${TITLE_DATA[prefix]}${thunderbird_version.split(".")[0]}`;
-    const link = `https://https://webextension-api.thunderbird.net/${prefix}-mv3/`
+    let v = "release";
+    if (thunderbird_version.includes("esr")) v = "esr";
+    if (thunderbird_version.includes("b")) v = "beta";
+    const title = `WebExtension APIs for Thunderbird ${TITLE_DATA[v].prefix}${thunderbird_version.split(".")[0]}`;
+    const link = `https://webextension-api.thunderbird.net/en/${TITLE_DATA[v].slug}mv3/`
 
     // Read fluent strings for permissions.
     let PERMISSION_LOCALES = await fs.readFile(path.join(config.schemas, `permissions.ftl`), "utf8");

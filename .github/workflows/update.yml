@@ -1,4 +1,4 @@
-name: Update WebExtension API documentation for a specify version
+name: Regenerate the WebExtension API documentation for a specify version
 
 on:
   workflow_call:
