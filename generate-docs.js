@@ -100,50 +100,35 @@ if (!config.schemas || !config.output || !config.manifest_version) {
         relatedNamespaceNames.set(schema.file, names);
     }
 
-    await tools.copyFolder(TEMPLATE_PATH, config.output);
-    await tools.processRstFiles(config.output, content => {
-        return tools.evaluateConditionTag(content, config)
-            .replace(/\$\(ref:(.*?)\)/g, (match, ref) =>
-                `:ref:${SBT}${tools.escapeUppercase(ref)}${SBT}`
-            )
-    });
-    
     const apiNames = [...namespaces.keys()]
-    await tools.replacePlaceholdersInFile(
-        config,
-        path.join(config.output, "index.rst"),
-        {
-            "{{TITLE}}": [
-                "=".repeat(title.length),
-                title,
-                "=".repeat(title.length),
-            ],
-            "{{API_LIST}}": apiNames.sort(),
-        }
-    );
-    await tools.replacePlaceholdersInFile(
-        config,
-        path.join(config.output, "conf.py"),
-        {
-            "{{TITLE}}":
-                [`${long_title}<br><br>Manifest V${config.manifest_version}`],
-        },
-        {
-            evaluateConditionTag: true
-        }
-    );
-    await tools.replacePlaceholdersInFile(
-        config,
-        path.join(config.output, "README.md"),
-        {
-            "{{TITLE}}": [
-                title,
-            ],
-            "{{LINK}}": [
-                link,
-            ],
-        }
-    );
+
+    await tools.copyFolder(TEMPLATE_PATH, config.output);
+    await tools.processFiles(config.output, /\.rst$/i, true, content => {
+        let rv = tools.evaluateConditionTag(content, config);
+        rv = tools.indentHonoringReplace(rv, "{{API_LIST}}", apiNames.sort())
+        rv = tools.indentHonoringReplace(rv, "{{TITLE}}", [
+            "=".repeat(title.length),
+            title,
+            "=".repeat(title.length),
+        ])
+        // Convert $(ref:...) to :ref:`...` with escaped upper case letters.
+        rv = rv.replace(/\$\(ref:(.*?)\)/g, (match, ref) =>
+            `:ref:${SBT}${tools.escapeUppercase(ref)}${SBT}`
+        )
+        return rv;
+    });
+
+    await tools.processFiles(config.output, "conf.py", false, content => {
+        let rv = tools.evaluateConditionTag(content, config);
+        rv = rv.replace("{{TITLE}}", `${long_title}<br><br>Manifest V${config.manifest_version}`)
+        return rv;
+    });
+
+    await tools.processFiles(config.output, "README.md", false, content => {
+        return content
+            .replace("{{TITLE}}", title)
+            .replace("{{LINK}}", link);
+    });
 
     // First loop over manifest schemas to extract extends and update the global
     // manifest schema.

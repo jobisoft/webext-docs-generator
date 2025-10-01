@@ -31,27 +31,37 @@ export function evaluateConditionTag(content, config) {
 }
 
 /**
- * Recursively process all .rst files in a folder.
+ * Recursively process all files in a folder matching the given string or regex.
  * 
  * @param {string} folderPath - Path to the folder to process.
+ * @param {RegExp|string} fileMatcher - Regex or literal string to match files.
+ * @param {boolean} recursive - Dive into subfolders 
  * @param {Function} callback - A callback function which accepts the content
  *   of the file as a parameter, and returns the manipulated content.
  */
-export async function processRstFiles(folderPath, callback) {
+export async function processFiles(folderPath, fileMatcher, recursive, callback) {
   const entries = await fs.readdir(folderPath, { withFileTypes: true });
 
   for (const entry of entries) {
     const fullPath = path.join(folderPath, entry.name);
 
     if (entry.isDirectory()) {
-      processRstFiles(fullPath, callback);
-    } else if (entry.isFile() && fullPath.endsWith('.rst')) {
-      let content = await fs.readFile(fullPath, 'utf8');
-      content = callback(content);
-      await fs.writeFile(fullPath, content, 'utf8');
+      if (recursive) await processFiles(fullPath, fileMatcher, recursive, callback);
+    } else if (entry.isFile()) {
+      const matches = 
+        typeof fileMatcher === 'string'
+          ? entry.name === fileMatcher
+          : fileMatcher instanceof RegExp && fileMatcher.test(entry.name);
+
+      if (matches) {
+        let content = await fs.readFile(fullPath, 'utf8');
+        content = await callback(content, fullPath);
+        await fs.writeFile(fullPath, content, 'utf8');
+      }
     }
   }
 }
+
 
 /**
  * Simple helper function to parse command line arguments.
@@ -228,31 +238,13 @@ function escapeRegex(str) {
   return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-/**
- * Replace placeholders in a file, keeping the existing indentation.
- *
- * @param {string} filename - Path to the file
- * @param {Object<string, string[]>} replacements - { placeholder: [lines...] }
- */
-export async function replacePlaceholdersInFile(config, filename, replacements, options = {}) {
-  let evalConditionTag = options.evaluateConditionTag ?? false;
-  let content = await fs.readFile(filename, "utf8");
-
-  for (const [placeholder, lines] of Object.entries(replacements)) {
-    const regex = new RegExp(`([ ]*)${escapeRegex(placeholder)}`, "gm");
-
-    content = content.replace(regex, (match, indent, offset, full) => {
-      // build replacement: new lines, each with same indent
-      const block = lines.map(l => `${indent}${l}`).join("\n");
-      return block;
-    });
-  }
-
-  if (evalConditionTag) {
-    content = evaluateConditionTag(content, config);
-  }
-
-  await fs.writeFile(filename, content, "utf8");
+export function indentHonoringReplace(content, placeholder, lines) {
+  const regex = new RegExp(`([ ]*)${escapeRegex(placeholder)}`, "gm");
+  return content.replace(regex, (match, indent, offset, full) => {
+    // build replacement: new lines, each with same indent
+    const block = lines.map(l => `${indent}${l}`).join("\n");
+    return block;
+  });
 }
 
 const stableStringify = (obj) => {
