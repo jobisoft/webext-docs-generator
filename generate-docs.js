@@ -44,11 +44,11 @@ const TITLE_DATA = {
         slug: "",
     },
     "esr": {
-        prefix: "ESR ",
+        prefix: "ESR ",
         slug: "esr-",
     },
     "beta": {
-        prefix: "BETA ",
+        prefix: "BETA ",
         slug: "beta-",
     },
 }
@@ -63,8 +63,9 @@ if (!config.schemas || !config.output || !config.manifest_version) {
     let v = "release";
     if (thunderbird_version.includes("esr")) v = "esr";
     if (thunderbird_version.includes("b")) v = "beta";
-    const title = `WebExtension APIs for Thunderbird ${TITLE_DATA[v].prefix}${thunderbird_version.split(".")[0]}`;
-    const link = `https://webextension-api.thunderbird.net/en/${TITLE_DATA[v].slug}mv3/`
+    const long_title = `WebExtension API Documentation for Thunderbird ${thunderbird_version}`;
+    const title = `WebExtension API Documentation & Guides (Thunderbird ${TITLE_DATA[v].prefix}${thunderbird_version.split(".")[0]}, Manifext V${config.manifest_version})`;
+    const link = `https://webextension-api.thunderbird.net/en/${TITLE_DATA[v].slug}mv${config.manifest_version}/`
 
     // Read fluent strings for permissions.
     let PERMISSION_LOCALES = await fs.readFile(path.join(config.schemas, `permissions.ftl`), "utf8");
@@ -117,7 +118,7 @@ if (!config.schemas || !config.output || !config.manifest_version) {
         path.join(config.output, "conf.py"),
         {
             "{{TITLE}}":
-                [`${title}<br><br>Manifest V${config.manifest_version}`],
+                [`${long_title}<br><br>Manifest V${config.manifest_version}`],
         }
     );
     await tools.replacePlaceholdersInFile(
