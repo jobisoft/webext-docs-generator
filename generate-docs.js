@@ -61,12 +61,12 @@ if (!config.schemas || !config.output || !config.manifest_version) {
     // Clone template folder and adjust cloned files.
     const schemas = await tools.getSchemaFiles(config.schemas);
     const thunderbird_version = schemas.map(a => a.data.map(e => e.applicationVersion).filter(Boolean)).flat().pop();
-    let v = "release";
-    if (thunderbird_version.includes("esr")) v = "esr";
-    if (thunderbird_version.includes("b")) v = "beta";
+    let VERSION = "release";
+    if (thunderbird_version.includes("esr")) VERSION = "esr";
+    if (thunderbird_version.includes("b")) VERSION = "beta";
     const long_title = `WebExtension API Documentation for Thunderbird ${thunderbird_version}`;
-    const title = `WebExtension API Documentation & Guides (Thunderbird ${TITLE_DATA[v].prefix}${thunderbird_version.split(".")[0]}, Manifext V${config.manifest_version})`;
-    const link = `https://webextension-api.thunderbird.net/en/${TITLE_DATA[v].slug}mv${config.manifest_version}/`
+    const title = `WebExtension API Documentation & Guides (Thunderbird ${TITLE_DATA[VERSION].prefix}${thunderbird_version.split(".")[0]}, Manifext V${config.manifest_version})`;
+    const link = `https://webextension-api.thunderbird.net/en/${TITLE_DATA[VERSION].slug}mv${config.manifest_version}/`
 
     // Read fluent strings for permissions.
     let PERMISSION_LOCALES = await fs.readFile(path.join(config.schemas, `permissions.ftl`), "utf8");
@@ -101,11 +101,39 @@ if (!config.schemas || !config.output || !config.manifest_version) {
     }
 
     await tools.copyFolder(TEMPLATE_PATH, config.output);
-    await tools.processRstFiles(config.output, content => content
-        .replace(/\$\(ref:(.*?)\)/g, (match, ref) => 
-            `:ref:${SBT}${tools.escapeUppercase(ref)}${SBT}`
-        ));
-
+    await tools.processRstFiles(config.output, content => {
+        return content
+            .replace(
+                /\{\{CONDITION:(.+?):([\s\S]*?)\}\}/g,
+                (match, conditionString, text) => {
+                    let conditions = conditionString.split(",");
+                    let include = true;
+                    conditionCheck: for (let condition of conditions) {
+                        let [key, value] = condition.split("=").map(s => s.trim());
+                        let values = value.split("|").map(v => v.trim());
+                        switch (key.toLowerCase()) {
+                            case "mv":
+                                if (!values.includes(config.manifest_version)) {
+                                    include = false;
+                                    break conditionCheck;
+                                }
+                                break;
+                            case "version":
+                                if (!values.map(e => e.toLowerCase()).includes(VERSION)) {
+                                    include = false;
+                                    break conditionCheck;
+                                }
+                                break;
+                        }
+                    }
+                    return include ? text : ""
+                }
+            )
+            .replace(/\$\(ref:(.*?)\)/g, (match, ref) =>
+                `:ref:${SBT}${tools.escapeUppercase(ref)}${SBT}`
+            )
+    });
+    
     const apiNames = [...namespaces.keys()]
     await tools.replacePlaceholdersInFile(
         path.join(config.output, "index.rst"),

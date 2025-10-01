@@ -12,4 +12,4 @@
 * :doc:`/guides/eventListeners`
 * :doc:`/guides/messageLists`
 * :doc:`/guides/vcard`
-* :doc:`/guides/manifestV3`
+{{CONDITION:MV=3:* :doc:`/guides/manifestV3`}}
