@@ -35,20 +35,20 @@ The files in the template folder are copied verbatim into the root folder of the
 - `MV=<version>`: Match the manifest version.  
 - `VERSION=<version>`: Match the product version.  
 
-Multiple values can be provided with `|` for OR logic. Multiple conditions separated by commas are evaluated with AND logic.
+Multiple values can be provided with `|` for *OR* logic. Multiple conditions separated by commas are evaluated with *AND* logic.
 
 ### Examples
 
 ```rst
 {{CONDITION:MV=3:* :doc:`/guides/manifestV3`}}
 ```
-- Include the text `* :doc:`/guides/manifestV3`` only if `MV=3`.  
+- Include the text `* :doc:/guides/manifestV3` only if `MV=3`.  
 
 ```rst
 {{CONDITION:MV=3,VERSION=ESR|RELEASE:Special multi line instructions for ESR
 or RELEASE...}}
 ```
-- Include text if `MV=3` **AND** `VERSION` is either `ESR` or `RELEASE` (and not `BETA`).
+- Include text if `MV=3` *AND* `VERSION` is either `ESR` *OR* `RELEASE` (and not `BETA`).
 
 ## 📦 Installation
 
