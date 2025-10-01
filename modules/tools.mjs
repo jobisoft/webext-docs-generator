@@ -1,6 +1,35 @@
 import { promises as fs } from "fs";
 import path from "path";
 
+export function evaluateConditionTag(content, config) {
+  return content.replace(
+    /\{\{CONDITION:(.+?):([\s\S]*?)\}\}/g,
+    (match, conditionString, text) => {
+      let conditions = conditionString.split(",");
+      let include = true;
+      conditionCheck: for (let condition of conditions) {
+        let [key, value] = condition.split("=").map(s => s.trim());
+        let values = value.split("|").map(v => v.trim());
+        switch (key.toLowerCase()) {
+          case "mv":
+            if (!values.includes(config.manifest_version)) {
+              include = false;
+              break conditionCheck;
+            }
+            break;
+          case "channel":
+            if (!values.map(e => e.toLowerCase()).includes(config.thunderbird_channel)) {
+              include = false;
+              break conditionCheck;
+            }
+            break;
+        }
+      }
+      return include ? text : ""
+    }
+  )
+}
+
 /**
  * Recursively process all .rst files in a folder.
  * 
@@ -9,19 +38,19 @@ import path from "path";
  *   of the file as a parameter, and returns the manipulated content.
  */
 export async function processRstFiles(folderPath, callback) {
-    const entries = await fs.readdir(folderPath, { withFileTypes: true });
+  const entries = await fs.readdir(folderPath, { withFileTypes: true });
 
-    for (const entry of entries) {
-        const fullPath = path.join(folderPath, entry.name);
+  for (const entry of entries) {
+    const fullPath = path.join(folderPath, entry.name);
 
-        if (entry.isDirectory()) {
-            processRstFiles(fullPath, callback);
-        } else if (entry.isFile() && fullPath.endsWith('.rst')) {
-            let content = await fs.readFile(fullPath, 'utf8');
-            content = callback(content);
-            await fs.writeFile(fullPath, content, 'utf8');
-        }
+    if (entry.isDirectory()) {
+      processRstFiles(fullPath, callback);
+    } else if (entry.isFile() && fullPath.endsWith('.rst')) {
+      let content = await fs.readFile(fullPath, 'utf8');
+      content = callback(content);
+      await fs.writeFile(fullPath, content, 'utf8');
     }
+  }
 }
 
 /**
@@ -205,7 +234,8 @@ function escapeRegex(str) {
  * @param {string} filename - Path to the file
  * @param {Object<string, string[]>} replacements - { placeholder: [lines...] }
  */
-export async function replacePlaceholdersInFile(filename, replacements) {
+export async function replacePlaceholdersInFile(config, filename, replacements, options = {}) {
+  let evalConditionTag = options.evaluateConditionTag ?? false;
   let content = await fs.readFile(filename, "utf8");
 
   for (const [placeholder, lines] of Object.entries(replacements)) {
@@ -216,6 +246,10 @@ export async function replacePlaceholdersInFile(filename, replacements) {
       const block = lines.map(l => `${indent}${l}`).join("\n");
       return block;
     });
+  }
+
+  if (evalConditionTag) {
+    content = evaluateConditionTag(content, config);
   }
 
   await fs.writeFile(filename, content, "utf8");

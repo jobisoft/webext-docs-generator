@@ -6,7 +6,7 @@ sys.path.append(os.path.abspath('_extensions'))
 project = u'{{TITLE}}'
 source_suffix = '.rst'
 master_doc = 'index'
-exclude_patterns = [u'_build', 'Thumbs.db', '.DS_Store', 'overlay']
+exclude_patterns = [u'_build', 'Thumbs.db', '.DS_Store', 'overlay' {{CONDITION:MV=2:, 'guides/manifestV3.rst'}}]
 
 extensions = [
     # ... other extensions here

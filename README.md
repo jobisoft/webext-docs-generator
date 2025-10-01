@@ -32,8 +32,8 @@ The files in the template folder are copied verbatim into the root folder of the
 
 ### Supported Conditions
 
-- `MV=<version>`: Match the manifest version.  
-- `VERSION=<version>`: Match the product version.  
+- `MV=<version>`: Match the manifest version (`2` or `3`).  
+- `CHANNEL=<channel>`: Match the product channel (`RELEASE`, `ESR` or `BETA`).  
 
 Multiple values can be provided with `|` for *OR* logic. Multiple conditions separated by commas are evaluated with *AND* logic.
 
@@ -45,10 +45,10 @@ Multiple values can be provided with `|` for *OR* logic. Multiple conditions sep
 - Include the text `* :doc:/guides/manifestV3` only if `MV=3`.  
 
 ```rst
-{{CONDITION:MV=3,VERSION=ESR|RELEASE:Special multi line instructions for ESR
+{{CONDITION:MV=3,CHANNEL=ESR|RELEASE:Special multi line instructions for ESR
 or RELEASE...}}
 ```
-- Include text if `MV=3` *AND* `VERSION` is either `ESR` *OR* `RELEASE` (and not `BETA`).
+- Include text if `MV=3` *AND* `CHANNEL` is either `ESR` *OR* `RELEASE`.
 
 ## 📦 Installation
 
