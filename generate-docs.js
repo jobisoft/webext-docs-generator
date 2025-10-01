@@ -48,7 +48,7 @@ const TITLE_DATA = {
         slug: "esr-",
     },
     "beta": {
-        prefix: "BETA ",
+        prefix: "Beta ",
         slug: "beta-",
     },
 }
