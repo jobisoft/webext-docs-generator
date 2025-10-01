@@ -1,4 +1,4 @@
-name: Regenerate the WebExtension API documentation for all versions
+name: Regenerate all versions of the WebExtension API documentation
 
 on:
   schedule:

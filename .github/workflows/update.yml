@@ -1,4 +1,4 @@
-name: Regenerate the WebExtension API documentation for a specify version
+name: Sub-Workflow to regenerate a single the WebExtension API documentation
 
 on:
   workflow_call:
