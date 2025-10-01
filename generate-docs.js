@@ -12,6 +12,7 @@ import { Writer } from './modules/writer.mjs';
 import { promises as fs } from "fs";
 import path from "path";
 
+const SBT = "`";
 const TEMPLATE_PATH = `template`;
 const HELP_SCREEN = `
 
@@ -100,6 +101,10 @@ if (!config.schemas || !config.output || !config.manifest_version) {
     }
 
     await tools.copyFolder(TEMPLATE_PATH, config.output);
+    await tools.processRstFiles(config.output, content => content
+        .replace(/\$\(ref:(.*?)\)/g, (match, ref) => 
+            `:ref:${SBT}${tools.escapeUppercase(ref)}${SBT}`
+        ));
 
     const apiNames = [...namespaces.keys()]
     await tools.replacePlaceholdersInFile(
@@ -110,7 +115,6 @@ if (!config.schemas || !config.output || !config.manifest_version) {
                 title,
                 "=".repeat(title.length),
             ],
-            "{{VERSION_NOTE}}": [],
             "{{API_LIST}}": apiNames.sort(),
         }
     );
@@ -173,10 +177,4 @@ if (!config.schemas || !config.output || !config.manifest_version) {
             "utf8"
         );
     }
-
-    await fs.writeFile(
-        path.join(`_all.json`),
-        JSON.stringify(schemas, null, 2),
-        "utf8"
-    );
 }

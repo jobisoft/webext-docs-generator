@@ -10,8 +10,6 @@
 
 {{TITLE}}
 
-{{VERSION_NOTE}}
-
 Getting started
 ===============
 

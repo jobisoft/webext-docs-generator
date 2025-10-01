@@ -2,6 +2,29 @@ import { promises as fs } from "fs";
 import path from "path";
 
 /**
+ * Recursively process all .rst files in a folder.
+ * 
+ * @param {string} folderPath - Path to the folder to process.
+ * @param {Function} callback - A callback function which accepts the content
+ *   of the file as a parameter, and returns the manipulated content.
+ */
+export async function processRstFiles(folderPath, callback) {
+    const entries = await fs.readdir(folderPath, { withFileTypes: true });
+
+    for (const entry of entries) {
+        const fullPath = path.join(folderPath, entry.name);
+
+        if (entry.isDirectory()) {
+            processRstFiles(fullPath, callback);
+        } else if (entry.isFile() && fullPath.endsWith('.rst')) {
+            let content = await fs.readFile(fullPath, 'utf8');
+            content = callback(content);
+            await fs.writeFile(fullPath, content, 'utf8');
+        }
+    }
+}
+
+/**
  * Simple helper function to parse command line arguments.
  *
  * @param {string[]} argv - Array of arguments (defaults to process.argv.slice(2))
