@@ -65,7 +65,7 @@ if (!config.schemas || !config.output || !config.manifest_version) {
     if (thunderbird_version.includes("esr")) config.thunderbird_channel = "esr";
     if (thunderbird_version.includes("b")) config.thunderbird_channel = "beta";
     const long_title = `WebExtension API Documentation for Thunderbird ${thunderbird_version}`;
-    const title = `WebExtension API Documentation & Guides (Thunderbird ${TITLE_DATA[config.thunderbird_channel].prefix}${thunderbird_version.split(".")[0]}, Manifext V${config.manifest_version})`;
+    const title = `WebExtension API Documentation & Guides (Thunderbird ${TITLE_DATA[config.thunderbird_channel].prefix}${thunderbird_version.split(".")[0]}, Manifest V${config.manifest_version})`;
     const link = `https://webextension-api.thunderbird.net/en/${TITLE_DATA[config.thunderbird_channel].slug}mv${config.manifest_version}/`
 
     // Read fluent strings for permissions.
