@@ -54,7 +54,7 @@ export class Writer {
         return value;
     }
 
-    api_member({ name = null, type = null, annotation = null, description = [], refId = null } = {}) {
+    api_member({ name = null, type = null, annotation = null, description = [], refId = null, refName = null, depth = 0 } = {}) {
         const lines = [
             ...this.reference(refId),
             "",
@@ -67,11 +67,17 @@ export class Writer {
         if (refId) {
             lines.push("   :refid: " + tools.guessRefId(tools.escapeUppercase(refId)));
         }
+        if (refName) {
+            lines.push("   :refname: " + refName);
+        }
         if (type) {
             lines.push("   :type: " + type);
         }
         if (annotation) {
             lines.push("   :annotation: " + annotation);
+        }
+        if (depth) {
+            lines.push("   :depth: " + depth);
         }
         if (description && description.length > 0) {
             lines.push("");
@@ -169,7 +175,7 @@ export class Writer {
         return "";
     }
 
-    format_object(name, obj, { print_description_only = false, print_enum_only = false, enumChanges = null, refId = null } = {}) {
+    format_object(name, obj, { print_description_only = false, print_enum_only = false, enumChanges = null, refId = null, depth = 0 } = {}) {
         // If we have received an enumChanges object and the obj does not already have one
         if (!obj.enumChanges && enumChanges !== null) {
             obj.enumChanges = enumChanges;
@@ -199,35 +205,42 @@ export class Writer {
             indent = "   ";
             content.push(...this.api_member({
                 name: parts.name,
-                type: parts.type,
+                type: `${parts.type}${parts.type_annotation}`,
                 annotation: parts.annotation,
-                refId
+                refId,
+                refName: parts.refName,
+                depth,
             }));
         }
 
-        let nested_content = [];
-        if (obj.type === "object" && obj.properties) {
-            const entries = Object.entries(obj.properties).sort(([a], [b]) => a.localeCompare(b));
+        const list_properties = (obj, depth) => {
+            let propertyList = [];
+            if (obj.type === "object" && obj.properties) {
+                const entries = Object.entries(obj.properties).sort(([a], [b]) => a.localeCompare(b));
 
-            // Required properties first
-            for (const [key, value] of entries) {
-                if (value.ignore) continue;
-                if (!value.optional) {
-                    nested_content.push(...this.format_object(key, value, {
-                        refId: refId ? `${refId}.${key}` : null
-                    }));
+                // Required properties first
+                for (const [key, value] of entries) {
+                    if (value.ignore) continue;
+                    if (!value.optional) {
+                        propertyList.push(...this.format_object(key, value, {
+                            refId: refId ? `${refId}.${key}` : null,
+                            depth,
+                        }));
+                    }
+                }
+
+                // Optional properties next
+                for (const [key, value] of entries) {
+                    if (value.ignore) continue;
+                    if (value.optional) {
+                        propertyList.push(...this.format_object(key, value, {
+                            refId: refId ? `${refId}.${key}` : null,
+                            depth,
+                        }));
+                    }
                 }
             }
-
-            // Optional properties next
-            for (const [key, value] of entries) {
-                if (value.ignore) continue;
-                if (value.optional) {
-                    nested_content.push(...this.format_object(key, value, {
-                        refId: refId ? `${refId}.${key}` : null
-                    }));
-                }
-            }
+            return propertyList;
         }
 
         if (print_enum_only) {
@@ -235,7 +248,27 @@ export class Writer {
         } else {
             content.push(...parts.description.map(sub => `${indent}${sub}`));
             content.push(...parts.enum.map(sub => `${indent}${sub}`));
-            content.push(...nested_content.map(sub => `${indent}${sub}`));
+            
+            if (obj.type === "object" && obj.properties) {
+                content.push(...list_properties(obj).map(sub => `${indent}${sub}`));
+            } else if (obj.choices?.length > 1 && obj.choices.some(c => c.type === "object" && c.properties)) {
+                // We cannot nest multiple api_members (the custom python class
+                // would get very complicated). Instead, we attach a depth property,
+                // so CSS can be used for the visual indentation.
+                for (let i=0; i < obj.choices.length; i++) {
+                    const nestedObj = obj.choices[i];
+                    let nested_parts = this.get_api_member_parts(nestedObj.name, nestedObj, refId ? `${refId}.${obj.name}` : null);
+                    content.push(...this.api_member({
+                        type: `${i < 0 ? "or " : ""}(${this.get_type(nestedObj, nestedObj.name)}):`,
+                        //annotation: nested_parts.annotation,
+                        description: nested_parts.description,
+                        depth: depth + 1,
+                    }));
+                    if (nestedObj.type === "object" && nestedObj.properties) {
+                        content.push(...list_properties(nestedObj, depth + 2).map(sub => `${sub}`));
+                    }
+                }
+            }
         }
 
         if (content.length > 0) {
@@ -390,7 +423,8 @@ export class Writer {
                     name: `:value:${SBT}${enum_value}${SBT}`,
                     annotation: enum_annotation,
                     description: enum_description,
-                    refId: refId ? `${refId}.${enum_value}` : null
+                    refId: refId ? `${refId}.${enum_value}` : null,
+                    refName: enum_value,
                 }));
             }
         }
@@ -677,16 +711,17 @@ export class Writer {
         const parts = {
             name: "",
             type: "",
+            type_annotation: "", //Unsupported or Deprecated
             annotation: "",
             description: new AdvancedArray(),
             enum: new AdvancedArray(),
+            refName: name,
         };
 
         // The return element is using a fake "_returns" name
         let type_string = "%s";
         if (name === "_returns") {
             if (value.optional) {
-                // type_string = "[%s]" activate not yet
                 type_string = "%s";
             }
         } else if (name) {
@@ -699,17 +734,17 @@ export class Writer {
             }
         }
 
-        if ("unsupported" in value) {
-            type_string += " **Unsupported.**";
-        } else if ("deprecated" in value) {
-            type_string += " **Deprecated.**";
-        }
-
         if ("type" in value || "$ref" in value) {
             parts.type = type_string.replace("%s", this.get_type(value, name));
         } else if ("choices" in value) {
             const choices = value.choices.map(choice => this.get_type(choice, name));
             parts.type = type_string.replace("%s", choices.join(" or "));
+        }
+
+        if ("unsupported" in value) {
+            parts.type_annotation += " **Unsupported.**";
+        } else if ("deprecated" in value) {
+            parts.type_annotation += " **Deprecated.**";
         }
 
         parts.description.append(this.format_description(value));
@@ -810,7 +845,8 @@ export class Writer {
             usedPermissions.append(this.api_member({
                 name: `:permission:${SBT}${value}${SBT}`,
                 description: [description],
-                refId: `${this.namespaceName}.permission.${value}`
+                refId: `${this.namespaceName}.permission.${value}`,
+                refName: value,
             }));
         }
 
