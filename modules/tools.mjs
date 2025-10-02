@@ -48,7 +48,7 @@ export async function processFiles(folderPath, fileMatcher, recursive, callback)
     if (entry.isDirectory()) {
       if (recursive) await processFiles(fullPath, fileMatcher, recursive, callback);
     } else if (entry.isFile()) {
-      const matches = 
+      const matches =
         typeof fileMatcher === 'string'
           ? entry.name === fileMatcher
           : fileMatcher instanceof RegExp && fileMatcher.test(entry.name);
@@ -421,4 +421,28 @@ export function mergeSchemaExtensions(dstObject, srcObject) {
 // entries which only differ by the casing (for example types and properties)
 export function escapeUppercase(str) {
   return str.replace(/[A-Z]/g, match => "^" + match.toLowerCase());
+}
+
+/**
+ * Guess the HTML anchor (refid) Sphinx will generate for a label.
+ * 
+ * - Splits the label on any non-alphanumeric or underscore character.
+ * - Removes empty entries.
+ * - Joins remaining parts with a hyphen.
+ * - Converts to lowercase.
+ * 
+ * @param {string} label - The RST label to normalize
+ * @returns {string} The guessed HTML anchor ID
+ */
+export function guessRefId(label) {
+  if (!label) return "";
+
+  // Split on anything except letters, digits, or underscore
+  let parts = label.split(/[^a-zA-Z0-9]+/);
+
+  // Filter out empty strings
+  parts = parts.filter(Boolean);
+
+  // Join with "-" and convert to lowercase
+  return parts.join('-').toLowerCase();
 }

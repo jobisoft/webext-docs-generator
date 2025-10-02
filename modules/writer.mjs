@@ -54,14 +54,18 @@ export class Writer {
         return value;
     }
 
-    api_member({ name = null, type = null, annotation = null, description = [] } = {}) {
+    api_member({ name = null, type = null, annotation = null, description = [], refId = null } = {}) {
         const lines = [
+            ...this.reference(refId),
             "",
             ".. api-member::",
         ];
 
         if (name) {
             lines.push("   :name: " + name);
+        }
+        if (refId) {
+            lines.push("   :refid: " + tools.guessRefId(tools.escapeUppercase(refId)));
         }
         if (type) {
             lines.push("   :type: " + type);
@@ -165,13 +169,13 @@ export class Writer {
         return "";
     }
 
-    format_object(name, obj, { print_description_only = false, print_enum_only = false, enumChanges = null } = {}) {
+    format_object(name, obj, { print_description_only = false, print_enum_only = false, enumChanges = null, refId = null } = {}) {
         // If we have received an enumChanges object and the obj does not already have one
         if (!obj.enumChanges && enumChanges !== null) {
             obj.enumChanges = enumChanges;
         }
 
-        const parts = this.get_api_member_parts(name, obj);
+        const parts = this.get_api_member_parts(name, obj, refId);
 
         // enum_only: fake header + enum
         // description_only: fake header + description + enum + nested
@@ -193,7 +197,12 @@ export class Writer {
             );
         } else {
             indent = "   ";
-            content.push(...this.api_member({ name: parts.name, type: parts.type, annotation: parts.annotation }));
+            content.push(...this.api_member({
+                name: parts.name,
+                type: parts.type,
+                annotation: parts.annotation,
+                refId
+            }));
         }
 
         let nested_content = [];
@@ -204,7 +213,9 @@ export class Writer {
             for (const [key, value] of entries) {
                 if (value.ignore) continue;
                 if (!value.optional) {
-                    nested_content.push(...this.format_object(key, value));
+                    nested_content.push(...this.format_object(key, value, {
+                        refId: refId ? `${refId}.${key}` : null
+                    }));
                 }
             }
 
@@ -212,7 +223,9 @@ export class Writer {
             for (const [key, value] of entries) {
                 if (value.ignore) continue;
                 if (value.optional) {
-                    nested_content.push(...this.format_object(key, value));
+                    nested_content.push(...this.format_object(key, value, {
+                        refId: refId ? `${refId}.${key}` : null
+                    }));
                 }
             }
         }
@@ -317,7 +330,7 @@ export class Writer {
         return permissions;
     }
 
-    format_enum(name, value) {
+    format_enum(name, value, refId) {
         if (value.enum == null) {
             if (value.items != null) {
                 return this.format_enum(name, value.items);
@@ -373,11 +386,11 @@ export class Writer {
                     enum_annotation = this.format_addition(schema_annotations[enum_value], 3);
                     enum_description = this.format_description(schema_annotations[enum_value]);
                 }
-
                 enum_lines.push(...this.api_member({
                     name: `:value:${SBT}${enum_value}${SBT}`,
                     annotation: enum_annotation,
-                    description: enum_description
+                    description: enum_description,
+                    refId: refId ? `${refId}.${enum_value}` : null
                 }));
             }
         }
@@ -412,15 +425,17 @@ export class Writer {
 
                     for (const [key, value] of items) {
                         if (!value.optional) {
-                            content.append(this.reference(`${this.namespaceName}.${typeDef.id}.${key}`));
-                            content.append(this.format_object(key, value));
+                            content.append(this.format_object(key, value, {
+                                refId: `${this.namespaceName}.${typeDef.id}.${key}`
+                            }));
                         }
                     }
 
                     for (const [key, value] of items) {
                         if (value.optional) {
-                            content.append(this.reference(`${this.namespaceName}.${typeDef.id}.${key}`));
-                            content.append(this.format_object(key, value));
+                            content.append(this.format_object(key, value, {
+                                refId: `${this.namespaceName}.${typeDef.id}.${key}`
+                            }));
                         }
                     }
                 }
@@ -429,7 +444,10 @@ export class Writer {
             } else {
                 section.append(this.api_header(
                     this.get_type(typeDef, typeDef.id),
-                    this.format_object(null, typeDef, { print_enum_only: true })
+                    this.format_object(null, typeDef, {
+                        print_enum_only: true,
+                        refId: `${this.namespaceName}.${typeDef.id}`
+                    })
                 ));
             }
         } else if ("choices" in typeDef) {
@@ -444,6 +462,7 @@ export class Writer {
                     this.format_object(null, choice, {
                         print_description_only: true,
                         enumChanges: typeDef.enumChanges,
+                        refId: `${this.namespaceName}.${typeDef.id}`
                     }))
                 );
             }
@@ -520,6 +539,8 @@ export class Writer {
         str = str.replace(/<dl>[\s\S]*?<\/dl>/i, "");
 
         const replacements = {
+            "<strong>": "**",
+            "</strong>": "**",
             "<em>": "*",
             "</em>": "*",
             "<b>": "**",
@@ -583,13 +604,14 @@ export class Writer {
         return str;
     }
 
-    reference(label) {
-        if (label === null || label === undefined) {
+    reference(refId) {
+        if (refId === null || refId === undefined) {
             return [];
         }
 
         return [
-            `.. _${tools.escapeUppercase(label)}:`,
+            "",
+            `.. _${tools.escapeUppercase(refId)}:`,
             ""
         ];
     }
@@ -651,7 +673,7 @@ export class Writer {
         return `:ref:${SBT}${tools.escapeUppercase(ref)}${SBT}`;
     }
 
-    get_api_member_parts(name, value) {
+    get_api_member_parts(name, value, refId) {
         const parts = {
             name: "",
             type: "",
@@ -692,7 +714,7 @@ export class Writer {
 
         parts.description.append(this.format_description(value));
         parts.annotation = this.format_addition(value, 2);
-        parts.enum.append(this.format_enum(name, value));
+        parts.enum.append(this.format_enum(name, value, refId));
 
         return parts;
     }
@@ -734,7 +756,9 @@ export class Writer {
                         return aSort < bSort ? -1 : aSort > bSort ? 1 : 0;
                     });
                     for (let [name, value] of items) {
-                        section.append(this.format_object(name, value));
+                        section.append(this.format_object(name, value, {
+                            refId: `${this.namespaceName}.${name}`
+                        }));
                     }
                 }
             }
@@ -785,7 +809,8 @@ export class Writer {
 
             usedPermissions.append(this.api_member({
                 name: `:permission:${SBT}${value}${SBT}`,
-                description: [description]
+                description: [description],
+                refId: `${this.namespaceName}.permission.${value}`
             }));
         }
 
@@ -842,7 +867,9 @@ export class Writer {
                             obj.returns = param.parameters[0];
                         }
                     } else {
-                        content.append(this.format_object(param.name, param));
+                        content.append(this.format_object(param.name, param, {
+                            refId: `${this.namespaceName}.${obj.name}.${param.name}`
+                        }));
                     }
                 }
                 if (content.length > 0) {
@@ -852,7 +879,9 @@ export class Writer {
 
             if ("returns" in obj) {
                 const content = new AdvancedArray();
-                content.append(this.format_object("_returns", obj.returns));
+                content.append(this.format_object("_returns", obj.returns, {
+                    refId: `${this.namespaceName}.${obj.name}.returns`
+                }));
                 content.append([
                     "",
                     ".. _Promise: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise"
@@ -908,7 +937,9 @@ export class Writer {
 
             let content = new AdvancedArray();
             for (const param of [listener, ...(event.extraParameters || [])]) {
-                content.append(this.format_object(param.name, param));
+                content.append(this.format_object(param.name, param, {
+                    refId: `${this.namespaceName}.${event.name}.${param.name}`
+                }));
             }
 
             const extraParams = (event.extraParameters || []).map(p => p.name);
@@ -920,7 +951,9 @@ export class Writer {
             if ("parameters" in event && event.parameters.length) {
                 content = new AdvancedArray();
                 for (const param of event.parameters) {
-                    content.append(this.format_object(param.name, param));
+                    content.append(this.format_object(param.name, param, {
+                        refId: `${this.namespaceName}.${event.name}.${param.name}`
+                    }));
                 }
                 section.append(
                     this.api_header("Parameters passed to the listener function", content)
@@ -930,7 +963,9 @@ export class Writer {
             if ("returns" in event) {
                 section.append(this.api_header(
                     "Expected return value of the listener function",
-                    this.format_object("", event.returns)
+                    this.format_object("", event.returns, {
+                        refId: `${this.namespaceName}.${event.name}.returns`
+                    })
                 ));
             }
 
