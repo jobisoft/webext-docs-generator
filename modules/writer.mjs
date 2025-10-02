@@ -259,7 +259,7 @@ export class Writer {
                     const nestedObj = obj.choices[i];
                     let nested_parts = this.get_api_member_parts(nestedObj.name, nestedObj, refId ? `${refId}.${obj.name}` : null);
                     content.push(...this.api_member({
-                        type: `${i < 0 ? "or " : ""}(${this.get_type(nestedObj, nestedObj.name)}):`,
+                        type: `${i > 0 ? "or " : ""}(${this.get_type(nestedObj, nestedObj.name)})${nested_parts.type_annotation}`,
                         //annotation: nested_parts.annotation,
                         description: nested_parts.description,
                         depth: depth + 1,
