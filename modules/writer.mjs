@@ -304,7 +304,14 @@ export class Writer {
                     this.foundPermissions.add(permission);
                     entries.permissions.entries.push(`:permission:${SBT}${permission}${SBT}`);
                 } else {
-                    entries.manifest.entries.push(`:value:${SBT}${permission.slice(9)}${SBT}`);
+                    // Only require manifestEntries which actually exists!
+                    // The way action and browserAction are derived from each
+                    // other requires both APIs to list both manifest entries...
+                    const manifestEntry = permission.slice(9);
+                    const manifestEntryExists = this.manifestSchema.types?.some(m => m.properties?.[manifestEntry]);
+                    if (manifestEntryExists) { 
+                        entries.manifest.entries.push(`:value:${SBT}${manifestEntry}${SBT}`);
+                    }
                 }
             }
         }
