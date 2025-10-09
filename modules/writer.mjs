@@ -527,7 +527,7 @@ export class Writer {
         for (let annotation of obj.annotations ?? []) {
             if (Object.hasOwn(annotation, "text")) {
                 section.append("");
-                section.append(this.replace_code(annotation.text));
+                section.append(this.replace_code(annotation.text.trim()));
                 section.append("");
             }
             if (Object.hasOwn(annotation, "code")) {
@@ -550,7 +550,7 @@ export class Writer {
                         "",
                         `.. ${box}::`,
                         "",
-                        `   ${this.replace_code(annotation[box])}`,
+                        `   ${this.replace_code(annotation[box].trim())}`,
                         "",
                     ])
                 }
