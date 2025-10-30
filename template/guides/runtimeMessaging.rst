@@ -179,7 +179,7 @@ If a WebExtension registers multiple ``runtime.onMessage`` listeners, and at lea
           console.log(`Hello from tab ${sender.tab.id}`);
           // Simulate async work
           await new Promise(resolve => setTimeout(resolve, 1000));
-          return { response: "Hi there!" };
+          return "Hi there!";
       }
     }
     messenger.runtime.onMessage.addListener(listener);  
