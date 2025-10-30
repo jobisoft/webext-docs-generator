@@ -20,6 +20,7 @@
 
   guides/innerHTML
   guides/eventListeners
+  guides/runtimeMessaging
   guides/messageLists
   guides/vcard
   {{CONDITION:MV=3:guides/manifestV3}}
