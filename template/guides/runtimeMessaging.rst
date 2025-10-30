@@ -177,7 +177,8 @@ If a WebExtension registers multiple ``runtime.onMessage`` listeners, and at lea
       switch (data.msg) {
         case "greet":
           console.log(`Hello from tab ${sender.tab.id}`);
-          await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate async work
+          // Simulate async work
+          await new Promise(resolve => setTimeout(resolve, 1000));
           return { response: "Hi there!" };
       }
     }
