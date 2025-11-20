@@ -93,7 +93,7 @@ if (!config.schemas || !config.output || !config.manifest_version) {
         // Find APIs which do not have a path and therefore no API namespace. In
         // order to document those, we create a fake API namespace, following the
         // same camel case notation.
-        if (!otherNamespaces.length && manifestNamespace.types.length) {
+        if (!otherNamespaces.length && manifestNamespace?.types?.length) {
             otherNamespaces = manifestNamespace.types
                 .filter(t => t.$extend === "WebExtensionManifest")
                 .flatMap(t => Object.keys(t.properties))
