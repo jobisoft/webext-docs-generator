@@ -64,3 +64,14 @@ jobs:
       manifestVersion: 3
     secrets:
       DOC_REPO_DEPLOY_KEY: ${{ secrets.DOC_REPO_DEPLOY_KEY }}
+
+
+  update-docs-daily-mv3:
+    if: ${{ always() }}
+    needs: update-docs-beta-mv3
+    uses: ./.github/workflows/update.yml
+    with:
+      release: daily
+      manifestVersion: 3
+    secrets:
+      DOC_REPO_DEPLOY_KEY: ${{ secrets.DOC_REPO_DEPLOY_KEY }}      
