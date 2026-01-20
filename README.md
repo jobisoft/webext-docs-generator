@@ -33,7 +33,7 @@ The files in the template folder are copied verbatim into the root folder of the
 ### Supported Conditions
 
 - `MV=<version>`: Match the manifest version (`2` or `3`).  
-- `CHANNEL=<channel>`: Match the product channel (`RELEASE`, `ESR` or `BETA`).  
+- `CHANNEL=<channel>`: Match the product channel (`RELEASE`, `ESR`, `BETA` or `DAILY`).  
 
 Multiple values can be provided with `|` for *OR* logic. Multiple conditions separated by commas are evaluated with *AND* logic.
 
