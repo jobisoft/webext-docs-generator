@@ -19,8 +19,7 @@ Instead of manually parsing or manipulating the vCard string, we recommend using
     "type": "module"
   },
 
-In accordance with Mozilla's `third-party library guidelines <https://extensionworkshop.com/documentation/publish/third-party-library-usage/
->`__, please include a ``VENDOR.md`` file that references this, as well as any other included third-party library files.
+In accordance with Mozilla's `third-party library guidelines <https://extensionworkshop.com/documentation/publish/third-party-library-usage/>`__, please include a ``VENDOR.md`` file that references this, as well as any other included third-party library files.
 
 .. code-block:: text
    :caption: VENDOR.md
