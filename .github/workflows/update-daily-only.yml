@@ -1,0 +1,13 @@
+name: Regenerate daily versions of the WebExtension API documentation
+
+on:
+  workflow_dispatch:      # Allow manual trigger as well
+
+jobs:
+  update-docs-daily-mv3:
+    uses: ./.github/workflows/update.yml
+    with:
+      release: daily
+      manifestVersion: 3
+    secrets:
+      DOC_REPO_DEPLOY_KEY: ${{ secrets.DOC_REPO_DEPLOY_KEY }}      
