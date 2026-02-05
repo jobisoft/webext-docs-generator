@@ -166,12 +166,16 @@ if (!config.schemas || !config.output || !config.manifest_version) {
     for (let [namespaceName, schema] of namespaces) {
         const manifestSchema = schema.find(e => e.namespace == "manifest");
         const namespaceSchema = schema.find(e => e.namespace == namespaceName);
+        const parentNamespaceSchemas = namespaceName.split(".").slice(0, -1)
+            .map((_, i, parts) => parts.slice(0, i + 1).join("."))
+            .map(name => namespaces.get(name)?.find(e => e.namespace == name));
 
         const writer = new Writer({
             config,
             namespaces,
             namespaceName,
             namespaceSchema,
+            parentNamespaceSchemas,
             manifestSchema,
             globalTypes,
             PERMISSION_LOCALES,

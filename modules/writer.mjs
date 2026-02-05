@@ -25,6 +25,9 @@ export class Writer {
     get namespaceSchema() {
         return this.#options.namespaceSchema;
     }
+    get parentNamespaceSchemas() {
+        return this.#options.parentNamespaceSchemas;
+    }
     get manifestSchema() {
         return this.#options.manifestSchema;
     }
@@ -283,62 +286,64 @@ export class Writer {
     async format_manifest_permissions() {
         const section = new AdvancedArray();
 
-        const entries = {
-            manifest: {
-                single: "A manifest entry named %s is required to use ``messenger.%s.*``.",
-                multiple: "One of the manifest entries %s or %s is required to use ``messenger.%s.*``.",
-                entries: [],
-            },
-            permissions: {
-                single: "The permission %s is required to use ``messenger.%s.*``.",
-                multiple: "One of the permissions %s or %s is required to use ``messenger.%s.*``.",
-                entries: [],
-            },
-        };
+        for (let namespaceSchema of [...this.parentNamespaceSchemas, this.namespaceSchema]) {
+            const entries = {
+                manifest: {
+                    single: "A manifest entry named %s is required to use ``messenger.%s.*``.",
+                    multiple: "One of the manifest entries %s or %s is required to use ``messenger.%s.*``.",
+                    entries: [],
+                },
+                permissions: {
+                    single: "The permission %s is required to use ``messenger.%s.*``.",
+                    multiple: "One of the permissions %s or %s is required to use ``messenger.%s.*``.",
+                    entries: [],
+                },
+            };
 
-        // Read globally required permissions first.
-        if (this.namespaceSchema?.permissions) {
-            const permissions = Array.from(new Set(this.namespaceSchema.permissions)).sort();
-            for (const permission of permissions) {
-                if (!permission.startsWith("manifest:")) {
-                    this.foundPermissions.add(permission);
-                    entries.permissions.entries.push(`:permission:${SBT}${permission}${SBT}`);
-                } else {
-                    // Only require manifestEntries which actually exists!
-                    // The way action and browserAction are derived from each
-                    // other requires both APIs to list both manifest entries...
-                    const manifestEntry = permission.slice(9);
-                    const manifestEntryExists = this.manifestSchema.types?.some(m => m.properties?.[manifestEntry]);
-                    if (manifestEntryExists) { 
-                        entries.manifest.entries.push(`:value:${SBT}${manifestEntry}${SBT}`);
+            // Read globally required permissions first.
+            if (namespaceSchema?.permissions) {
+                const permissions = Array.from(new Set(namespaceSchema.permissions)).sort();
+                for (const permission of permissions) {
+                    if (!permission.startsWith("manifest:")) {
+                        this.foundPermissions.add(permission);
+                        entries.permissions.entries.push(`:permission:${SBT}${permission}${SBT}`);
+                    } else {
+                        // Only require manifestEntries which actually exists!
+                        // The way action and browserAction are derived from each
+                        // other requires both APIs to list both manifest entries...
+                        const manifestEntry = permission.slice(9);
+                        const manifestEntryExists = this.manifestSchema.types?.some(m => m.properties?.[manifestEntry]);
+                        if (manifestEntryExists) { 
+                            entries.manifest.entries.push(`:value:${SBT}${manifestEntry}${SBT}`);
+                        }
                     }
                 }
             }
-        }
 
-        for (const entrytype of ["manifest", "permissions"]) {
-            const entry = entries[entrytype];
-            let text = "";
-            if (entry.entries.length === 0) continue;
-            else if (entry.entries.length === 1) {
-                text = entry.single.replace("%s", entry.entries[0]).replace("%s", this.namespaceName);
-            } else {
-                const last = entry.entries.pop();
-                text = entry.multiple
-                    .replace("%s", entry.entries.join(", "))
-                    .replace("%s", last)
-                    .replace("%s", this.namespaceName);
+            for (const entrytype of ["manifest", "permissions"]) {
+                const entry = entries[entrytype];
+                let text = "";
+                if (entry.entries.length === 0) continue;
+                else if (entry.entries.length === 1) {
+                    text = entry.single.replace("%s", entry.entries[0]).replace("%s", this.namespaceName);
+                } else {
+                    const last = entry.entries.pop();
+                    text = entry.multiple
+                        .replace("%s", entry.entries.join(", "))
+                        .replace("%s", last)
+                        .replace("%s", this.namespaceName);
+                }
+
+                section.append([
+                    "",
+                    ".. rst-class:: api-permission-info",
+                    "",
+                    ".. note::",
+                    "",
+                    "   " + text,
+                    ""
+                ]);
             }
-
-            section.append([
-                "",
-                ".. rst-class:: api-permission-info",
-                "",
-                ".. note::",
-                "",
-                "   " + text,
-                ""
-            ]);
         }
 
         return section;
@@ -347,6 +352,7 @@ export class Writer {
     format_required_permissions(obj) {
         // Merge globally required permissions and object-specific permissions
         const allPermissions = [
+            ...this.parentNamespaceSchemas.flatMap(s => s?.permissions || []),
             ...(this.namespaceSchema?.permissions || []),
             ...(obj?.permissions || []),
         ];
