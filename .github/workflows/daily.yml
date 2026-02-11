@@ -1,4 +1,4 @@
-name: Regenerate daily versions of the WebExtension API documentation
+name: Regenerate daily version of the WebExtension API documentation (manual)
 
 on:
   workflow_dispatch:      # Allow manual trigger as well
