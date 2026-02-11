@@ -51,24 +51,21 @@ jobs:
 
       - name: Diagnose SSH key format
         run: |
-          echo "=== Key file header (first 2 lines) ==="
-          head -n 2 ~/.ssh/id_rsa
+          echo "=== SSH/OpenSSL versions on runner ==="
+          ssh -V 2>&1
+          openssl version
           echo ""
-          echo "=== Key file footer (last 2 lines) ==="
-          tail -n 2 ~/.ssh/id_rsa
-          echo ""
-          echo "=== SSH version ==="
-          ssh -V
-          echo ""
-          echo "=== OpenSSH version that created this key ==="
+          echo "=== Key format detection ==="
           if head -n 1 ~/.ssh/id_rsa | grep -q "BEGIN OPENSSH PRIVATE KEY"; then
-            echo "Key is in OpenSSH format (newer format)"
+            echo "Key format: OpenSSH"
           elif head -n 1 ~/.ssh/id_rsa | grep -q "BEGIN RSA PRIVATE KEY"; then
-            echo "Key is in PEM/RSA format (older format)"
+            echo "Key format: PEM/RSA"
           elif head -n 1 ~/.ssh/id_rsa | grep -q "BEGIN EC PRIVATE KEY"; then
-            echo "Key is in PEM/EC format"
+            echo "Key format: PEM/EC"
+          elif head -n 1 ~/.ssh/id_rsa | grep -q "BEGIN PRIVATE KEY"; then
+            echo "Key format: PKCS#8 PEM"
           else
-            echo "Unknown key format"
+            echo "Key format: Unknown or unrecognized"
           fi
 
       - name: Clone docs repo
