@@ -40,6 +40,28 @@ jobs:
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan github.com >> ~/.ssh/known_hosts
 
+      - name: Diagnose SSH key format
+        run: |
+          echo "=== Key file header (first 2 lines) ==="
+          head -n 2 ~/.ssh/id_rsa
+          echo ""
+          echo "=== Key file footer (last 2 lines) ==="
+          tail -n 2 ~/.ssh/id_rsa
+          echo ""
+          echo "=== SSH version ==="
+          ssh -V
+          echo ""
+          echo "=== OpenSSH version that created this key ==="
+          if head -n 1 ~/.ssh/id_rsa | grep -q "BEGIN OPENSSH PRIVATE KEY"; then
+            echo "Key is in OpenSSH format (newer format)"
+          elif head -n 1 ~/.ssh/id_rsa | grep -q "BEGIN RSA PRIVATE KEY"; then
+            echo "Key is in PEM/RSA format (older format)"
+          elif head -n 1 ~/.ssh/id_rsa | grep -q "BEGIN EC PRIVATE KEY"; then
+            echo "Key is in PEM/EC format"
+          else
+            echo "Unknown key format"
+          fi
+
       - name: Clone docs repo
         run: |
           # Remove existing docs folder if it exists
